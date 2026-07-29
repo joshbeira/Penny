@@ -1,4 +1,4 @@
-P0 — complete; one verification item outstanding (see below)
+P0 — complete
 
 Scaffold per SPEC §17 P0: §3 tree, §2 deps, Tailwind v4 via @tailwindcss/vite,
 five routed screens, TabBar in §10 order, /api/tts 502 stub.
@@ -14,6 +14,20 @@ Structure decisions (agreed with the user; the spec was ambiguous on each):
 - Screens carry no <h1>: §10 puts the single h1 in the shared Header (P1).
   TabBar is built in §10 order so no DOM reordering is ever needed.
 
+DEVIATION FROM SPEC (approved by the user):
+- §3 pins "dev": "vercel dev". That value is rejected outright by the Vercel
+  CLI, which static-regex tests the dev script at startup:
+      /\b(now|vercel)\b\W+\bdev\b/.test(pkg?.scripts?.dev || "")
+  It never consults project settings, and is bypassed only by a legacy
+  vercel.json "builds" array, which would disable zero-config and break dev by
+  another route. So §3's value makes §17 P0's "vercel dev serves the app" and
+  §18's "npx vercel dev" both impossible. Changed to "dev": "vite".
+  The real dev command comes from Vercel Project Settings -> Development
+  Command -> `vite --port $PORT`, which getCommand() returns ahead of any
+  package.json script. All other §3 scripts remain verbatim.
+  NOTE: that override lives in Vercel, not in git, so a fresh clone needs it set
+  before `vercel dev` behaves identically.
+
 Verified:
 - tsc --noEmit clean; npm run build ok (37 modules, 1.55s)
 - Tailwind v4 compiled: every utility used is in the emitted CSS, @layer
@@ -21,24 +35,21 @@ Verified:
 - §2 versions resolved exactly as pinned (vite 6.4.3, react 18.3.1,
   react-router-dom 6.30.4, ts 5.9.3, tailwind 4.3.3, zustand 5.0.14,
   tone 15.1.22, tesseract.js 5.1.1, vite-plugin-pwa 0.21.2, sharp 0.33.5)
-- Chromium at 390x844: TabBar navigates Home / Post Box / Receipts / Settings;
-  /journey routed but absent from the TabBar; tap targets 98x48 (§4 min 48px);
-  landmarks main + navigation present; zero console errors
-- api/tts.ts handler returns 502 with {"ok": false}
-
-Outstanding:
-- `vercel dev` cannot start while §3 pins "dev": "vercel dev".
-  @vercel/static-build's getCommand() gives a package.json dev script precedence
-  over the framework's devCommand (its ignorePackageJsonScript escape hatch
-  applies to "build" only), so the parent vercel dev spawns `npm run dev`, which
-  re-enters vercel dev and trips its __VERCEL_DEV_RUNNING guard.
-  Fix is Vercel Project Settings -> Development Command -> `vite --port $PORT`.
-  No repo change; Framework Preset is already set to Vite.
+- vercel dev serves the app: / /postbox /journey -> 200, log confirms
+  `Running Dev Command "vite --port $PORT"`
+- POST /api/tts -> HTTP 502 (server: Vercel), matching §17 P0's stub requirement
+- Chromium at 390x844 against vercel dev: TabBar navigates Home / Post Box /
+  Receipts / Settings; /journey routed but absent from the TabBar; tap targets
+  98x48 (§4 min 48px); landmarks main + navigation present; zero console errors
 
 Known dependency advisories (unfixable without moving §2's pins, so left alone):
 sharp (libvips CVEs, dev-only, used once in P7 on an SVG we author) and
 react-router-dom (open redirect via backslash in <Link>; Penny has no
 user-controlled navigation targets). Remainder are transitive under
 vite-plugin-pwa.
+
+Environment note: Playwright's Chromium system libs were installed on this
+machine (libnspr4, libnss3, libnssutil3, libasound2); §16's Layout Lock gate in
+P7 needs them.
 
 P1 — not started
