@@ -73,9 +73,10 @@ body {
   outline-offset: 2px;
 }
 
-/* SPEC 4 / 15: all motion sits behind prefers-reduced-motion. The sound-dot is
-   the product's single visual signature; P2 applies .sound-dot--speaking while
-   audio.ts reports playback. */
+/* SPEC 4 / 15: all motion sits behind prefers-reduced-motion — the sound-dot
+   pulse and the row flashes both. SoundDot.tsx applies .sound-dot--speaking
+   while audio.ts reports playback; Home applies .row-flash for 400ms as
+   playWeek reaches each note (SPEC 7.2). */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes penny-pulse {
     0%,
@@ -89,5 +90,12 @@ body {
 
   .sound-dot--speaking {
     animation: penny-pulse 600ms ease-out infinite;
+  }
+
+  /* Matches the anomaly row's permanent border (border-l-[3px] pl-2), so a
+     flashing anomaly row does not shift. */
+  .row-flash {
+    border-left: 3px solid var(--amber);
+    padding-left: 0.5rem;
   }
 }

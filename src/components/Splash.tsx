@@ -1,25 +1,41 @@
 import { useNavigate } from "react-router-dom";
 import SoundDot from "./SoundDot";
+import { speak, unlock } from "../lib/audio";
+import { glance } from "../lib/earcons";
 import { useSession } from "../state/session";
+import { useSettings } from "../state/settings";
 
 // SPEC 6.1. The whole screen is one button; contents in the spec's order —
 // wordmark (28px), sound-dot, caption.
-//
-// P1 sets state and navigates, and touches no audio API at all: SPEC 6.1 bars
-// any audio call before session.unlocked, and SPEC 3 puts unlock() in
-// lib/audio.ts, which arrives in P2. The unlock primitives (Tone.start(), a
-// 30ms silent buffer, speechSynthesis.cancel() then resume()) land there,
-// alongside the `greet` line and glance().
 export default function Splash() {
   const navigate = useNavigate();
   const setUnlocked = useSession((state) => state.setUnlocked);
 
-  const open = () => {
-    // P2 (SPEC 6.1): await unlock() from lib/audio.ts.
+  const open = async () => {
+    // SPEC 6.1's first four steps: Tone.start(), the 30ms silent buffer, then
+    // speechSynthesis.cancel()/resume().
+    await unlock();
     setUnlocked(true);
-    // P2 (SPEC 6.1): speak({ id: "greet" }), skipped in Quiet Mode.
+
+    // "play fixed line greet (skipped in Quiet Mode)" — skipped outright, not
+    // routed through speak(): SPEC 6.3 step 2 would otherwise surface it as a
+    // text card, and SPEC 6.1 says the line is not played at all.
+    //
+    // Awaited so the Glance is heard on its own. SPEC 6.3's queue orders spoken
+    // lines against each other; earcons are a separate channel and would
+    // otherwise start over the greeting.
+    if (!useSettings.getState().quietMode) await speak({ id: "greet" });
+
     navigate("/", { replace: true });
-    // P2 (SPEC 6.1): glance(); setGlancePlayedThisSession(true).
+
+    // "run glance() once (session.glancePlayedThisSession = true)". Home's
+    // button and the director's Replay Glance (P6) re-run it deliberately; this
+    // flag only guards the automatic one.
+    const session = useSession.getState();
+    if (!session.glancePlayedThisSession) {
+      session.setGlancePlayedThisSession(true);
+      void glance();
+    }
   };
 
   // Full-screen in normal flow rather than `fixed`: the splash is the only
@@ -30,7 +46,7 @@ export default function Splash() {
     <button
       type="button"
       aria-label="Open Penny"
-      onClick={open}
+      onClick={() => void open()}
       className="flex min-h-dvh w-full flex-col items-center justify-center gap-4 bg-bg"
     >
       <span className="text-screen">Penny</span>

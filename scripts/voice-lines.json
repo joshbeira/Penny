@@ -1,0 +1,17 @@
+[
+  { "id": "greet", "text": "Hi. I'm Penny." },
+  { "id": "summary_card", "text": "From Meridian Bank. Your debit card ending four four eight two expires at the end of July. A replacement needs ordering." },
+  { "id": "offer_card", "text": "Shall I order your replacement?" },
+  { "id": "readback_card", "text": "Ordering a replacement debit card to your home address at forty two Lavender Grove. It will arrive in five working days. Double-tap to confirm." },
+  { "id": "done_receipt", "text": "Done. Receipt saved." },
+  { "id": "cancel_ok", "text": "Cancelled. Nothing was done." },
+  { "id": "summary_nhs", "text": "From City Eye Clinic. Your appointment is Tuesday the fourth of August at ten a m, with Mr Rahman. Bring your current glasses." },
+  { "id": "pin_privacy", "text": "That letter contains your PIN. I hid it before reading anything. It never left your phone." },
+  { "id": "scam_filed", "text": "This matches a prize-draw scam reported two hundred and fourteen times this month. I've filed it for you. No action needed." },
+  { "id": "tap_coffee", "text": "The Coffee House is requesting four pounds eighty five. Double-tap to approve." },
+  { "id": "tap_unknown", "text": "New merchant. TicketPoint Limited is requesting sixty eight pounds twenty. Double-tap to approve, or press cancel." },
+  { "id": "payment_done", "text": "Approved. Receipt saved." },
+  { "id": "quiet_on", "text": "Quiet Mode. I'll whisper." },
+  { "id": "chain_ok", "text": "Chain verified. No one has rewritten history." },
+  { "id": "read_fallback", "text": "I couldn't reach the cloud, so I read this privately on your phone." }
+]

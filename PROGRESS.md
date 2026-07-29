@@ -139,4 +139,151 @@ Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness):
 - VITE_BREAK_LAYOUT=1 swaps Home to ["Play my week","Play the Glance"]; unset
   restores spec order
 
-P2 — not started
+P2 — complete
+
+Sound and touch per SPEC §17 P2: lib/audio.ts (unlock + speak() + fixed-line
+player + sound-dot state), lib/earcons.ts (glance + playWeek with the row-sync
+callback), lib/haptics.ts (vibrate or WebAudio blips), the §6.1 splash sequence,
+the live region actually mirroring, and Home's two buttons wired. Also
+data/voiceLines.ts + scripts/voice-lines.json (§6.2 inventory; §14 names the
+JSON the single source of truth so P7's generate-voice.mjs and the app share it).
+
+Decisions referred to the user (SPEC §17's phase table contradicted §6.3/§11.3):
+- Quiet Mode is gateway-only in P2. speak() mirrors to aria-live, plays no
+  speech and returns; §6.3 step 2's TextCard render stays in P5, which §17
+  assigns "Quiet matrix (§11.3), TextCards". A comment marks the seam.
+- Splash order is §6.1's literal sequence, so `greet` is awaited before
+  glance(). The Glance is therefore never heard over speech — which matters,
+  because Appendix A beat 3 films exactly that moment. Visual consequence: App
+  gates on session.unlocked and §6.1 flips it before greet, so the splash
+  dismisses on tap and greet plays over Home. Keeping the splash up would mean
+  re-architecting P1's gate, which §6.1 does not ask for.
+- `quiet_on` (§11.3) defers to P5 with the rest of the Quiet matrix, so
+  Header.tsx is untouched in P2. This overrides P1's note above, which expected
+  it to land with audio.ts; §17 is the authority.
+
+CRITICAL FINDING — tone must be dynamically imported:
+  tone's index.js evaluates getContext() at module top level (its deprecated
+  Transport/Destination/Master/Listener/Draw/context exports), and getContext()
+  constructs a real AudioContext. The package does not declare
+  `sideEffects: false`, so Rollup cannot drop them. A static
+  `import * as Tone from "tone"` builds an AudioContext on page load — before
+  the splash tap — breaking §6.1's "No audio API may be called anywhere before
+  session.unlocked is true", the invariant P1 proved.
+  So audio.ts loads Tone with `await import("tone")` inside unlock() and hands
+  the module to earcons.ts/haptics.ts via ensureUnlocked(). Verified: zero
+  AudioContexts on load, exactly one after the tap. It also splits Tone into its
+  own 340 KB chunk, leaving a 186 KB entry.
+
+Reload safety (a consequence of P1's sessionStorage decision):
+  session.unlocked survives a full page load, so the splash is skipped and
+  unlock() never runs on that page — yet Home's Glance button is right there.
+  ensureUnlocked() therefore awaits unlock() rather than assuming it ran; every
+  caller is inside a click, so Tone.start() still has its gesture, and unlock()
+  is idempotent. Without this every audio call after a refresh would fail.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- audio.ts owns the live-region text as well as the sound-dot flag. §7.1/§7.2
+  post their completion lines straight to aria-live — routing them through
+  speak() would speak them — and audio.ts is the only non-component module both
+  it and earcons.ts share. Both are consumed with React 18's
+  useSyncExternalStore, so no fifth store file appears beside §3's four.
+- The sound-dot flag is a refcount, not a boolean: §4 pulses the dot for speech
+  *and* earcons, which are independent channels.
+- LiveRegion renders its text in a `key`-ed inner span so replaying the Glance
+  re-announces an identical string. The aria-live container never remounts.
+- The 30ms silent buffer (§6.1) is a WAV data URI built at runtime and played
+  through the *same* HTMLAudioElement speak() reuses — that element is what
+  Android actually unlocks. §3's tree has no audio asset to ship instead.
+- §7's −8 dB master is set at the end of unlock(): the first legal moment to
+  touch Tone and the last before any earcon.
+- The anomaly dyad is one PolySynth(Tone.Synth) over §7.1's motif voice. §7.1
+  says "second synth at −4dB relative", and a mono Tone.Synth cannot sound two
+  notes. The bill ping stays on the motif synth — only the anomaly tick is given
+  a synth of its own.
+- §8's "60ms apart" / "40ms apart" is the silent gap, not onset spacing: it
+  mirrors the pause inside each vibration pattern (confirm is 80 on, 60 off, 80
+  on, so its blips are 40 on, 60 off, 40 on).
+- Blips do not pulse the sound-dot: §4 pulses it for speech and earcons, and a
+  blip is standing in for a vibration.
+- playWeek's onNote fires through Tone's Draw (rAF against the AudioContext
+  clock, not Transport) so the row flash cannot drift; the anomaly haptic uses a
+  timer instead, so a dropped frame cannot swallow the buzz.
+- Composed aria-live lines spell counts as words and follow the spec's own
+  casing: "Played seven days." mid-sentence, "One bill this week." at a
+  sentence start.
+- Every earcon creates its nodes per call and disposes them on a timer past the
+  release tail (Glance +0.4s, playWeek +1s for the PluckSynth ring-out).
+  Starting an earcon tears down the previous one, so double-tapping cannot
+  double-schedule.
+- speak() takes `text` over `lineText(id)` for the mirror when both are given
+  (§11.1 step 8's read-back), so a screen reader hears "42 Lavender Grove", not
+  "forty two".
+
+SPEC CONTRADICTION, resolved by the acceptance criterion (not a free choice):
+  §7.1 gates the anomaly tick on "any tx in the last 7 days", but the §5
+  fixtures are dated 2026-07-06..12, so a wall-clock window is always empty and
+  the tick could never fire — while §7.1's own closing line and §17 P2 both
+  require "rising triad + bill ping + anomaly tick". The only reading that
+  satisfies the acceptance criterion is that the WEEK array *is* the week:
+  week.some(tx => tx.isAnomaly).
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness; the
+WebAudio/speech/vibration surfaces were wrapped from outside so no debug hooks
+were added to the shipped code):
+- tsc --noEmit clean; npm run build ok; tone absent from the entry chunk
+  (no ToneAudioNode/createOscillator/StereoPanner), present in the lazy chunk
+- §6.1: 0 AudioContexts, 0 oscillators, 0 speechSynthesis calls and 1 JS chunk
+  on load; after the tap exactly 1 AudioContext and 2 chunks
+- greet reaches speechSynthesis as "Hi. I'm Penny.", lang en-GB, rate 1 — the
+  expected path with no MP3s recorded and /api/tts still the 502 stub
+- Glance note-for-note: C4@0, E4@0.22, G4@0.44 (triangle), A5@0.72,
+  C5+F#5@0.95 — audible span 1.07s, inside §7.1's 2s. Three native oscillators
+  (Tone.Synth is monophonic and carries all four motif notes on one; the dyad's
+  PolySynth allocates two voices)
+- identical note schedule across three consecutive replays
+- playWeek: onsets 0 · 0.12 · 0.629 · 0.749 · 1.257 · 1.886 · 2.514 · 3.143
+  (+dyad 3.193 ×2) · 3.771, i.e. 0.3 + 4.4×day/7 with +0.12 same-day and the
+  dyad +0.05; 9 panners with credits at −0.7 ×2 and debits at +0.7 ×7; timbres
+  triangle ×2 + sine ×2 + square + sawtooth, plus 3 PluckSynth buffer sources
+- all 9 rows flash in array order, TicketPoint at 3.134s after the first
+- aria-live: "Steady. One bill this week. One unusual payment." and
+  "Played seven days. One unusual payment on Saturday."
+- haptics never both: with navigator.vibrate present, [40,40,40,40,40] once and
+  no 1600Hz blip; with it removed, no vibrate call and three 1600Hz sine blips
+  70ms apart. Note desktop Chrome *defines* navigator.vibrate (a no-op without
+  hardware), so the dev machine correctly gets silence — the blip branch is
+  reachable only by removing it, which is how it was tested
+- Quiet Mode: Glance still plays all six notes, zero speech, live region still
+  carries the line; a fresh session in Quiet Mode skips greet entirely
+- disposal: one Glance issues 148 disconnects, ten issue 1480 — linear, no
+  accumulation
+- sound-dot gains .sound-dot--speaking during playback (computed animation
+  penny-pulse) and loses it after
+- reload safety: after a refresh the splash is skipped and the Glance still
+  plays all six notes, no page errors
+- no regression: landmark order banner · main · navigation · status and exactly
+  one h1 on all five routes, zero serious/critical axe violations, every tap
+  target ≥ 48×48, zero console errors
+- VITE_BREAK_LAYOUT=1 renders ["Play my week","Play the Glance"]; unset renders
+  the §10 order
+
+Not verified here (needs real hardware, before filming): that speechSynthesis
+is actually audible and intelligible on the target Android device, and that
+navigator.vibrate produces the intended patterns. Headless Chromium ships no
+voices and no vibration motor, so the harness asserts the call sites, not the
+output.
+
+TWO ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P2):
+- §13.2's real /api/tts is unassigned. No phase in §17 claims the ElevenLabs
+  implementation — P0 built the 502 stub, P2 needs only that stub, and P7 covers
+  the *script* (§14), not the function. It has to land somewhere before filming
+  or Penny never uses the ElevenLabs voice at runtime.
+- P2 creates a P7 Layout Lock hazard. §16's walk clicks body to dismiss the
+  Splash, which now triggers greet and the Glance, which post text into the
+  aria-live region — and ariaSnapshot captures it. Measured on /postbox: the
+  status region is "" at networkidle and
+  "Steady. One bill this week. One unusual payment." three seconds later. §16
+  snapshots at networkidle, so today it captures the empty region, but that is a
+  race, not a guarantee. P7's check.mjs needs a deterministic answer (settle-wait
+  or audio suppression).
