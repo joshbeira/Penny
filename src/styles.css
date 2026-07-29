@@ -1,3 +1,93 @@
 @import "tailwindcss";
 
-/* SPEC 4 design tokens land in P1. */
+/* SPEC 4 design tokens, under the spec's own names. */
+:root {
+  --bg: #101418;
+  --surface: #1A2129;
+  --surface-raised: #232B35;
+  --text: #F5F7FA;
+  --text-dim: #9AA7B4;
+  --amber: #FFB703;
+  --amber-press: #E09E00;
+  --danger: #FF5C5C;
+  --hairline: #2C3540;
+
+  /* SPEC 4's font stack is declared here, not only as --font-sans below:
+     Tailwind's preflight sets html's font-family from --default-font-family,
+     which is tree-shaken out, so it would otherwise fall back to Tailwind's own
+     stack. `:root` outranks preflight's `html` selector. */
+  font-family: Arial, "Helvetica Neue", system-ui, sans-serif;
+
+  /* SPEC 4 scale: "18 body (root)", line-height 1.4. Every pixel value the spec
+     pins (48/56px targets, 10px dot, 3px ring, 16/999px radii, the six type
+     steps) is written as a px literal, never a rem utility, because 1rem is
+     18px here. */
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* The type scale and font stack are literals, so a plain @theme block. Setting
+   --font-sans is what makes Tailwind's own preflight use the SPEC 4 stack. */
+@theme {
+  --font-sans: Arial, "Helvetica Neue", system-ui, sans-serif;
+
+  --text-caption: 16px;
+  --text-caption--line-height: 1.4;
+  --text-body: 18px;
+  --text-body--line-height: 1.4;
+  --text-card: 22px;
+  --text-card--line-height: 1.4;
+  --text-screen: 28px;
+  --text-screen--line-height: 1.4;
+  --text-amount: 40px;
+  --text-amount--line-height: 1.4;
+  --text-health: 64px;
+  --text-health--line-height: 1.4;
+}
+
+/* `inline` is required: Tailwind v4 only resolves theme variables that
+   reference other CSS variables when the block is inlined. The colour tokens
+   cannot keep their spec names in here — inside @theme, `--text-dim` would be
+   read as a font-size named "dim". Note the 40px step is `amount`, not
+   `balance`: `text-balance` is already a built-in text-wrap utility. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-amber: var(--amber);
+  --color-amber-press: var(--amber-press);
+  --color-danger: var(--danger);
+  --color-hairline: var(--hairline);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* SPEC 4: visible focus ring on every focusable element. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* SPEC 4 / 15: all motion sits behind prefers-reduced-motion. The sound-dot is
+   the product's single visual signature; P2 applies .sound-dot--speaking while
+   audio.ts reports playback. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes penny-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.4);
+    }
+  }
+
+  .sound-dot--speaking {
+    animation: penny-pulse 600ms ease-out infinite;
+  }
+}
