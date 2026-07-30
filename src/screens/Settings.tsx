@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { useSettings } from "../state/settings";
+import { useDirector } from "../state/director";
+import type { ArmedLetter } from "../state/director";
 
 // SPEC 10 specifies aria-pressed for the Header's Quiet Mode toggle, so the
 // three Settings toggles use the same pattern. The track is aria-hidden, which
@@ -38,6 +40,52 @@ function Toggle({
   );
 }
 
+// TEMPORARY — REMOVE IN P6.
+//
+// SPEC 11.1 step 3 reads director.armedLetter, but SPEC 12.2's panel is P6, so
+// P3 has no way to arm a letter and neither filmed scenario (SPEC 12.3 A and D)
+// could be reached. This is the smallest stand-in: SPEC 12.2's own five radio
+// labels and nothing else.
+//
+// It sits AFTER "About Penny" so it reorders none of SPEC 10's Settings
+// elements. It must be deleted when DirectorPanel.tsx lands, BEFORE P7 writes
+// any Layout Lock baseline — otherwise SPEC 16 enshrines a debug control in the
+// shipped accessibility tree.
+const ARMED: { value: ArmedLetter; label: string }[] = [
+  { value: "live", label: "Live API" },
+  { value: "card", label: "Card" },
+  { value: "nhs", label: "NHS" },
+  { value: "scam", label: "Scam" },
+  { value: "pin", label: "PIN" },
+];
+
+function ArmedLetterControl() {
+  const armedLetter = useDirector((state) => state.armedLetter);
+  const setArmedLetter = useDirector((state) => state.setArmedLetter);
+
+  return (
+    <fieldset className="mt-6 border-t border-hairline pt-2">
+      <legend className="text-caption text-text-dim">Armed letter (temporary — P6)</legend>
+      {ARMED.map((option) => (
+        <label
+          key={option.value}
+          className="flex min-h-[48px] items-center gap-3 text-body"
+        >
+          <input
+            type="radio"
+            name="armed-letter"
+            value={option.value}
+            checked={armedLetter === option.value}
+            onChange={() => setArmedLetter(option.value)}
+            className="h-[20px] w-[20px] accent-amber"
+          />
+          {option.label}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 // SPEC 10 order: Quiet Mode · Voice input · Demo mode · Journey link · About
 // Penny. That order is the Layout Lock baseline (SPEC 16) — never reorder.
 export default function Settings() {
@@ -64,6 +112,8 @@ export default function Settings() {
         Nothing happens until Penny reads it back and you confirm. Every action leaves a receipt.
       </p>
       <p className="mt-2 text-caption text-text-dim">Prototype v1.0</p>
+
+      <ArmedLetterControl />
     </>
   );
 }

@@ -1,5 +1,319 @@
-// P0 placeholder. The capture button, masking states and reading modes arrive
-// in P3 (SPEC 10, 11.1). No h1 here — see Home.tsx.
+import { useEffect, useRef, useState } from "react";
+import ConfirmSheet from "../components/ConfirmSheet";
+import type { ConfirmMethod } from "../components/ConfirmSheet";
+import { SCENARIOS } from "../data/letters";
+import type { Letter } from "../data/letters";
+import type { FixedLineId } from "../data/voiceLines";
+import { speak } from "../lib/audio";
+import { captureCanvas, toBase64 } from "../lib/capture";
+import { maskImage, startWorker } from "../lib/ocrMask";
+import { useDirector } from "../state/director";
+import { useReceipts } from "../state/receipts";
+
+// SPEC 10's Post Box and SPEC 11.1's pipeline. Element order is the Layout Lock
+// baseline (SPEC 16) — never reorder.
+//
+// SPEC 3 has no module for the pipeline itself, so the orchestration lives here
+// in the screen; capture.ts and ocrMask.ts own their steps.
+
+// A letter as the UI consumes it. SPEC 5.3's `key` is a fixture identifier —
+// SPEC 13.1's seven keys do not include it, so a live API letter has none.
+type Reading = Omit<Letter, "key">;
+
+// SPEC 11.1 step 6: "fixtures use their fixed audio ids; live API letters use
+// runtime TTS". SPEC 5.3 marks which summary_spoken values are recorded lines.
+// scam has none — SPEC 5.3 says its summary is "superseded in the UI by the
+// fixed scam_filed line", which is SPEC 11.4, and SPEC 17 puts that in P5.
+const SUMMARY_LINE: Record<Letter["key"], FixedLineId | null> = {
+  card: "summary_card",
+  nhs: "summary_nhs",
+  pin: "pin_privacy",
+  scam: null,
+};
+
+// SPEC 11.1 step 3.
+const READ_TIMEOUT_MS = 8_000;
+
+type Mode = "summary" | "exact" | "explain";
+
+// SPEC 10: "segmented mode switch Summary | Exact | Explain (fixed order)".
+const MODES: { value: Mode; label: string }[] = [
+  { value: "summary", label: "Summary" },
+  { value: "exact", label: "Exact" },
+  { value: "explain", label: "Explain" },
+];
+
+type Result = {
+  letter: Reading;
+  summaryId: FixedLineId | null;
+  preview: string;
+  maskedCount: number | null;
+};
+
 export default function PostBox() {
-  return <p>Post Box</p>;
+  const [status, setStatus] = useState<"idle" | "masking" | "result">("idle");
+  const [result, setResult] = useState<Result | null>(null);
+  const [mode, setMode] = useState<Mode>("summary");
+  const [confirming, setConfirming] = useState(false);
+  const preview = useRef<string | null>(null);
+
+  // SPEC 11.1 step 2: "a tesseract.js `eng` worker is created when Post Box
+  // mounts (show nothing; first use may take seconds — the *masking* state
+  // covers it)". Failures are swallowed here for exactly that reason —
+  // maskImage() falls back to the "Masking unavailable" chip on its own.
+  useEffect(() => {
+    void startWorker().catch(() => undefined);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (preview.current) URL.revokeObjectURL(preview.current);
+    },
+    [],
+  );
+
+  async function onFile(file: File) {
+    setStatus("masking");
+    setResult(null);
+    setMode("summary");
+
+    // SPEC 11.1 step 1, then step 2 — and step 2 is unconditional. Masking
+    // completes before the armed letter is even read, so no branch below can
+    // reach the network with an unmasked image. This ordering is the privacy
+    // claim; it must not be reordered or made conditional.
+    const canvas = await captureCanvas(file);
+    const { maskedBlob, maskedCount } = await maskImage(canvas);
+
+    const { letter, summaryId } = await read(maskedBlob);
+
+    if (preview.current) URL.revokeObjectURL(preview.current);
+    preview.current = URL.createObjectURL(maskedBlob);
+
+    setResult({ letter, summaryId, preview: preview.current, maskedCount });
+    setStatus("result");
+
+    await announce(letter, summaryId);
+  }
+
+  // SPEC 11.1 steps 3 and 4.
+  async function read(maskedBlob: Blob): Promise<{ letter: Reading; summaryId: FixedLineId | null }> {
+    const armed = useDirector.getState().armedLetter;
+
+    // Step 3: "if director.armedLetter !== 'live' → use that fixture, skip
+    // network." Nothing is encoded and no request is made on this path — which
+    // is what makes SPEC 12.3 scenario D work with the radios off.
+    if (armed !== "live") {
+      // SPEC CONTRADICTION, resolved with the user.
+      //   SPEC 12.3 D and SPEC 17 P3 both require `read_fallback` in scenario D
+      //   (armed "PIN", airplane mode), but step 3 above skips the network, so
+      //   step 4's failure branch — the only thing that plays the line — can
+      //   never run on an armed path.
+      //   The only reading that satisfies SPEC 12.3 A, SPEC 12.3 D and P3's
+      //   acceptance criterion together is that the difference between A and D
+      //   is the one the spec itself states: A is labelled "online", D is
+      //   labelled "Airplane mode". So the line is gated on connectivity, not
+      //   on the arming. Still no request is made.
+      if (!navigator.onLine) await speak({ id: "read_fallback" });
+      return { letter: SCENARIOS[armed], summaryId: SUMMARY_LINE[armed] };
+    }
+
+    try {
+      return { letter: await readLive(maskedBlob), summaryId: null };
+    } catch {
+      // Step 4: "Any failure (abort, non-200, invalid JSON) → play
+      // read_fallback, then use fixture SCENARIOS[...]". The spec's own
+      // expression is `armedLetter !== "live" ? armedLetter : "card"`, but this
+      // branch is only reachable when armed IS "live", so it reduces to "card".
+      await speak({ id: "read_fallback" });
+      return { letter: SCENARIOS.card, summaryId: SUMMARY_LINE.card };
+    }
+  }
+
+  async function readLive(maskedBlob: Blob): Promise<Reading> {
+    // SPEC 11.1 step 3: base64 of the MASKED blob, no `data:` prefix.
+    const imageBase64 = await toBase64(maskedBlob);
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), READ_TIMEOUT_MS);
+    try {
+      const response = await fetch("/api/read-letter", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageBase64, mediaType: "image/jpeg" }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`/api/read-letter responded ${response.status}`);
+
+      // Throws on invalid JSON, which step 4 lists alongside abort and non-200.
+      const data = (await response.json()) as { ok?: boolean; letter?: Record<string, unknown> };
+      if (!data.ok || !data.letter) throw new Error("/api/read-letter returned no letter");
+
+      return normalise(data.letter);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  // SPEC 11.1 steps 5 to 7 and 9, in order.
+  async function announce(letter: Reading, summaryId: FixedLineId | null) {
+    // Step 9: scam_alert hands off to SPEC 11.4 — the alert buzz, the danger
+    // tint, `scam_filed` replacing the summary and the silent auto-receipt.
+    // SPEC 17 assigns all of that to P5, so P3 speaks nothing here rather than
+    // speaking a summary SPEC 5.3 says is superseded. SEAM: P5.
+    if (letter.required_action === "scam_alert") return;
+
+    if (letter.sensitive_content) {
+      // Step 5: "play pin_privacy first (for the pin fixture this IS the
+      // summary; do not speak a second summary)". A live sensitive letter has
+      // no fixed id, so its own summary still follows.
+      await speak({ id: "pin_privacy" });
+      if (summaryId !== "pin_privacy") await speak({ text: letter.summary_spoken });
+    } else {
+      await speak(summaryId ? { id: summaryId } : { text: letter.summary_spoken });
+    }
+
+    // Step 7: "after summary, play offer_card; show the action button".
+    if (letter.required_action === "order_card") await speak({ id: "offer_card" });
+  }
+
+  // SPEC 10: "switching modes speaks that mode's text". SPEC 11.1 step 6 fixes
+  // which text: Summary keeps its recorded line where there is one, Exact and
+  // Explain always go through runtime TTS (and so through speechSynthesis
+  // whenever /api/tts is unavailable).
+  function pick(next: Mode) {
+    setMode(next);
+    if (!result) return;
+    const { letter, summaryId } = result;
+
+    if (next === "exact") void speak({ text: letter.exact_text });
+    else if (next === "explain") void speak({ text: letter.explain_spoken });
+    else void speak(summaryId ? { id: summaryId } : { text: letter.summary_spoken });
+  }
+
+  // SPEC 11.1 step 8's exact payload.
+  async function onConfirm(method: ConfirmMethod) {
+    setConfirming(false);
+    await useReceipts.getState().addReceipt({
+      action: "Replacement card ordered",
+      details: "Arriving in 5 working days to home address",
+      method,
+    });
+    void speak({ id: "done_receipt" });
+  }
+
+  return (
+    <>
+      {/* SPEC 10: a styled <label> wrapping an sr-only file input, so the
+          control has a real accessible name (SPEC 15). */}
+      <label className="flex min-h-[56px] w-full cursor-pointer items-center justify-center rounded-full bg-amber px-6 text-body text-bg">
+        Photograph a letter
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // Cleared so photographing the same file twice still fires change.
+            event.target.value = "";
+            if (file) void onFile(file);
+          }}
+        />
+      </label>
+
+      {status === "idle" && (
+        <p className="mt-4 text-caption text-text-dim">Point at any letter — bank or not.</p>
+      )}
+
+      {status === "masking" && (
+        <div className="mt-4">
+          <p className="text-body">Reading privately on your phone…</p>
+          {/* Indeterminate; aria-hidden so the line above is the only
+              announcement. */}
+          <div aria-hidden="true" className="mt-2 h-[4px] overflow-hidden rounded-full bg-surface">
+            <div className="h-full w-1/3 rounded-full bg-amber masking-bar" />
+          </div>
+        </div>
+      )}
+
+      {status === "result" && result && (
+        <section className="mt-4 rounded-2xl bg-surface p-4">
+          <h2 className="text-card">{result.letter.sender}</h2>
+          <p className="mt-1 text-caption text-text-dim">{result.letter.letter_type}</p>
+
+          <img
+            src={result.preview}
+            alt="Masked photograph of the letter"
+            className="mt-3 max-h-[180px] w-full rounded-2xl object-contain"
+          />
+          <p className="mt-2 text-caption text-text-dim">
+            {result.maskedCount === null
+              ? "Masking unavailable"
+              : `${result.maskedCount} items hidden on device`}
+          </p>
+
+          <div role="group" aria-label="Reading mode" className="mt-4 flex gap-2">
+            {MODES.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={mode === option.value}
+                onClick={() => pick(option.value)}
+                className={`flex min-h-[48px] flex-1 items-center justify-center rounded-full border text-body ${
+                  mode === option.value
+                    ? "border-amber bg-amber text-bg"
+                    : "border-hairline text-text"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {/* SPEC 10: the action row exists only for order_card. */}
+          {result.letter.required_action === "order_card" && (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="mt-4 flex min-h-[56px] w-full items-center justify-center rounded-full bg-amber px-6 text-body text-bg"
+            >
+              Order replacement card
+            </button>
+          )}
+        </section>
+      )}
+
+      {confirming && (
+        <ConfirmSheet
+          // SPEC 11.1 step 8, verbatim. `text` spells the number and `id` names
+          // the recording of it, so the live region reads "42 Lavender Grove"
+          // while the audio says "forty two".
+          readback={{
+            id: "readback_card",
+            text: "Ordering a replacement debit card to your home address at 42 Lavender Grove. It will arrive in five working days. Double-tap to confirm.",
+          }}
+          // SPEC 4: one name for the action the whole way through.
+          actionLabel="Order replacement card"
+          onConfirm={(method) => void onConfirm(method)}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// SPEC 13.1 validates all five required_action values server-side; SPEC 19 has
+// no form-fill flow and SPEC 10 gives a UI only to order_card and scam_alert,
+// so "map confirm_address/form_fill to none client-side" happens here.
+function normalise(letter: Record<string, unknown>): Reading {
+  const action = letter.required_action;
+  return {
+    sender: String(letter.sender),
+    letter_type: String(letter.letter_type),
+    summary_spoken: String(letter.summary_spoken),
+    explain_spoken: String(letter.explain_spoken),
+    required_action: action === "order_card" || action === "scam_alert" ? action : "none",
+    sensitive_content: Boolean(letter.sensitive_content),
+    exact_text: String(letter.exact_text),
+  };
 }

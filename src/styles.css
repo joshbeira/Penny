@@ -98,4 +98,20 @@ body {
     border-left: 3px solid var(--amber);
     padding-left: 0.5rem;
   }
+
+  /* SPEC 10's indeterminate bar on Post Box's *masking* state. Behind
+     prefers-reduced-motion like every other animation (SPEC 4 / 15); with
+     motion reduced the bar simply sits still and the text carries the state. */
+  @keyframes penny-masking {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+
+  .masking-bar {
+    animation: penny-masking 1200ms ease-in-out infinite;
+  }
 }

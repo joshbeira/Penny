@@ -287,3 +287,146 @@ TWO ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P2):
   snapshots at networkidle, so today it captures the empty region, but that is a
   race, not a guarantee. P7's check.mjs needs a deterministic answer (settle-wait
   or audio suppression).
+
+P3 — complete
+
+Post Box per SPEC §17 P3: data/letters.ts (§5.3), lib/capture.ts + lib/ocrMask.ts
+(§11.1 steps 1–2), the armed-fixture/API/fallback logic and three reading modes
+in screens/PostBox.tsx (§10, §11.1), components/ConfirmSheet.tsx (§9.1), and the
+receipt write on lib/hash.ts + state/receipts.ts (§9.2). Also api/read-letter.ts
+(§13.1) and state/director.ts's armedLetter (§12.2).
+
+Decisions referred to the user (§17 assigns these to no phase, or the spec
+contradicts itself):
+- api/read-letter.ts is built here, verbatim from §13.1. §17 names no owner —
+  the same gap P2 recorded for §13.2's tts — but P3 owns its only caller (§11.1
+  step 3). With no ANTHROPIC_API_KEY it returns an immediate 502, which is
+  §13.1's specified behaviour and the path §11.1 step 4 is built for.
+- §9.2 lands whole (store + addReceipt + verifyChain). P3 needs addReceipt for
+  step 8; splitting a six-line function across phases buys nothing. P4 adds only
+  the list UI, verify banner, chain_ok, read-aloud and the director's seed/reset.
+- The tesseract runtime assets are committed to public/tesseract/ (~11 MB).
+- state/director.ts now, panel in P6, plus a temporary Settings control.
+
+SPEC CONTRADICTION, resolved with the user (not a free choice):
+  §12.3 D and §17 P3 both require `read_fallback` in scenario D (armed "PIN",
+  airplane mode), but §11.1 step 3 skips the network whenever armedLetter is not
+  "live" — so step 4's failure branch, the only thing that plays that line, is
+  unreachable on every armed path. The reading that satisfies §12.3 A, §12.3 D
+  and P3's acceptance criterion together is that the difference between A and D
+  is the one the spec itself states: A is labelled "online", D is labelled
+  "Airplane mode". So the line is gated on navigator.onLine, not on the arming,
+  and still no request is made.
+
+CRITICAL FINDING — tesseract.js does not bundle itself:
+  5.1.1 fetches all three runtime assets from jsdelivr by default — worker.min.js
+  (worker/browser/defaultOptions.js), the core (worker-script/browser/getCore.js)
+  and eng.traineddata (worker-script/index.js:129) — and @tesseract.js-data/eng
+  is not installed at all. §12.3 D runs in airplane mode and asserts "tesseract
+  is bundled", so all three are served from our own origin out of
+  public/tesseract/ via workerPath/corePath/langPath.
+  Both LSTM core variants ship because getCore() feature-detects SIMD and picks
+  the filename itself. Only the .wasm.js glue files are needed: they embed the
+  binary as base64 and reference no sibling .wasm, which halves the payload.
+  The files stay in public/ rather than being ?url-imported — Vite would hash
+  them, and corePath must address a directory.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- maskedCount is `number | null`. §11.1 step 2 outputs `{maskedBlob,
+  maskedCount}`, but §10's chip must distinguish "0 items hidden on device" from
+  "Masking unavailable"; null carries the second state without adding a field.
+- A thrown OCR error takes the timeout branch. §11.1 names only the 10s timeout,
+  but a worker that fails to load means the same thing to the user, and
+  "Masking unavailable" is already §10's chip for it.
+- ocrMask.ts keeps recognition and drawing separate, so the canvas is written
+  synchronously only after the 10s race settles. A recognise call that finishes
+  late therefore cannot paint over an image already encoded and sent.
+- The worker is started on mount and never terminated. §11.1 fixes creation and
+  says nothing about teardown; tearing down on tab-change would re-instantiate
+  ~4 MB of wasm every time the user returns to Post Box.
+- ConfirmSheet's `actionLabel` names the dialog. §9.1 lists it as a prop but
+  gives the button itself the literal label "Confirm", and §4 wants one name per
+  action all the way through.
+- The sheet holds a one-decision guard: without it a fast double-tap *on* the
+  Confirm button fires the button's onClick and then the sheet's double-tap
+  detector — two confirms, two receipts.
+- Receipt ids come from crypto.randomUUID(), available in the same secure
+  context sha256Hex already requires. §9.2 types `id` but never says its source.
+- §10's chip is rendered on its literal template, so a count of 1 reads
+  "1 items hidden on device". The spec pins the string; pluralising it would be
+  inventing a decision.
+- scam_alert speaks nothing in P3. §11.1 step 9 hands it to §11.4, which §17
+  assigns to P5, so P3 does not speak a summary §5.3 calls superseded. Marked
+  SEAM in the source.
+- Masking runs even when a fixture is armed: steps 2 and 3 are sequential and
+  step 2 is unconditional. It is what makes scenario D's chip count real.
+
+TEMPORARY, MUST BE REMOVED IN P6:
+  Settings carries an armed-letter radio group (§12.2's five labels), appended
+  after "About Penny" so it reorders none of §10's Settings elements. §11.1 step
+  3 reads director.armedLetter but §12.2's panel is P6, so without it neither
+  filmed scenario could be reached. It must be deleted when DirectorPanel.tsx
+  lands, BEFORE P7 writes any Layout Lock baseline.
+
+Verified (390×844 Chromium; the fetch/speech surfaces were wrapped from outside,
+so no debug hooks were added to the shipped code):
+- tsc --noEmit clean; npm run build ok (1053 modules)
+- §5.3: all 14 prose strings byte-identical to the spec, and card/nhs/pin
+  summary_spoken match their §6.2 fixed-line texts exactly
+- §13.1's SYSTEM_PROMPT is byte-identical to the spec (767 chars, compared
+  programmatically rather than by eye)
+- POST /api/read-letter with no ANTHROPIC_API_KEY → HTTP 502 {"ok":false}
+- ORDERING PROOF (the privacy claim): with armed "live" the POST fires at
+  1832ms, after masking opened at 908ms. The bytes that went over the wire were
+  decoded and measured: 92,774 dark pixels and a 235px longest solid-black run,
+  against 53,423 and 29px for the source prop — i.e. solid fillRect blocks the
+  source does not have. Rendered, the PIN, all four card-number groups and the
+  sort code are blacked out and the prose is untouched
+- zero /api/read-letter calls when armedLetter !== "live", and masking still
+  reports 7 items hidden
+- scenario A (armed Card, online): summary_card → offer_card → action button →
+  read-back announced with "42 Lavender Grove" → double-tap → exactly one
+  receipt with §11.1 step 8's exact action/details/method and a genesis prevHash
+  → done_receipt. No read_fallback while online
+- scenario D (armed PIN, airplane mode flipped after the app is open, as §12.3 D
+  and Appendix A beat 2 film it): 7 items hidden offline, read_fallback,
+  pin_privacy, and no second summary after it
+- fallback matrix on armed "live": the real 502, a 500, a 200 with invalid JSON,
+  and an 8s abort each play read_fallback and land on the card fixture
+- masking timeout: language data stalled past 10s → gave up at 10.3s, chip reads
+  "Masking unavailable", the letter is still read
+- chain: two receipts link prevHash→hash, hashes are 64 hex chars, verifyChain
+  returns {ok:true}; hand-editing entry 1's details returns {ok:false,brokenAt:1}
+- mode switch: fixed order Summary|Exact|Explain, Summary pressed on arrival,
+  and each selection speaks its own text (summary_nhs by id, exact_text and
+  explain_spoken through runtime TTS)
+- ConfirmSheet: focus trapped inside the dialog, Escape cancels, focus returns
+  to the invoking button, cancel_ok spoken, no receipt written
+- §6.1 invariant intact with tesseract in the bundle: 0 AudioContexts and 0
+  speechSynthesis calls before the splash tap, exactly 1 after
+- no regression on all five routes: DOM order header·main·nav·div, aria order
+  banner·main·navigation·status, exactly one h1, zero serious/critical axe
+  violations, every tap target ≥48×48, zero console errors
+- VITE_BREAK_LAYOUT=1 renders ["Play my week","Play the Glance"]; unset renders
+  the §10 order (verified by rendering both builds — grepping the bundle is the
+  wrong instrument, since the swap is a runtime array order and the string
+  literals keep their source order either way)
+
+Harness note: §16's walk must reuse ONE tab. session.unlocked lives in
+sessionStorage, which is per-tab, so a fresh tab per route re-arms the Splash and
+its navigate-to-Home turns four of the five baselines into copies of Home. This
+is the hazard P1 recorded when it chose sessionStorage; P7's check.mjs has to
+honour it.
+
+THREE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P3):
+- P6 must delete the temporary Settings control above.
+- §14 pins includeAssets to ["audio/*.mp3", "icons/*"], and Workbox's default
+  globs cover neither .wasm.js nor .traineddata.gz. Measured: a COLD start with
+  the radios already off cannot mask — the chip reads "Masking unavailable" and
+  only the fixture text is read. Scenario D as filmed is unaffected (the app is
+  already open and §11.1 step 2's worker was created on mount), but P7's own
+  criterion, "installed PWA passes scenario D offline", needs public/tesseract/*
+  precached.
+- P7 Layout Lock timing: §16's walk now visits /postbox, which starts the worker
+  and pulls ~7 MB before networkidle. It settles, but it joins the aria-live race
+  P2 already flagged as something check.mjs must answer deterministically.
