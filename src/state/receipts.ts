@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { sha256Hex } from "../lib/hash";
+// The `.ts` extension is required by Node's ESM loader, which does no extension
+// search — hash.test.ts and receipts.test.ts run on `node --test` with native
+// type stripping, and they import this module. tsconfig's
+// allowImportingTsExtensions permits it; Vite and esbuild resolve it unchanged.
+import { sha256Hex } from "../lib/hash.ts";
 
 // SPEC 9.2, complete. P3 needs addReceipt for SPEC 11.1 step 8; verifyChain is
 // the other half of the same spec block and is left whole rather than split
@@ -31,6 +35,7 @@ type ReceiptsState = {
   receipts: Receipt[];
   addReceipt: (entry: Pick<Receipt, "action" | "details" | "method">) => Promise<Receipt>;
   verifyChain: () => Promise<ChainResult>;
+  seedDemo: () => Promise<void>;
   reset: () => void;
 };
 
@@ -71,6 +76,31 @@ export const useReceipts = create<ReceiptsState>()(
           }
         }
         return { ok: true };
+      },
+
+      // SPEC 12.2's "Seed demo receipts": "writes exactly two: 'Replacement
+      // card ordered' and 'Scam letter filed', with the SPEC 11 details/
+      // methods". The payloads below are SPEC 11.1 step 8 and SPEC 11.4
+      // verbatim. SPEC 11.1 step 8's method is whatever the user confirmed
+      // with, so the seed takes "double-tap" — the method SPEC 11.2 hard-codes
+      // for the analogous demo receipt, and the one SPEC 12.3 A films.
+      //
+      // Sequential awaits, so the second entry links to the first. It appends
+      // rather than replacing: SPEC 12.2 lists "Reset receipts" separately.
+      //
+      // SEAM: P6. SPEC 12.2's panel is the only caller; there is no UI for this
+      // in P4.
+      seedDemo: async () => {
+        await get().addReceipt({
+          action: "Replacement card ordered",
+          details: "Arriving in 5 working days to home address",
+          method: "double-tap",
+        });
+        await get().addReceipt({
+          action: "Scam letter filed",
+          details: "Prize-draw pattern · 214 reports this month",
+          method: "auto",
+        });
       },
 
       reset: () => set({ receipts: [] }),

@@ -430,3 +430,141 @@ THREE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P3):
 - P7 Layout Lock timing: §16's walk now visits /postbox, which starts the worker
   and pulls ~7 MB before networkidle. It settles, but it joins the aria-live race
   P2 already flagged as something check.mjs must answer deterministically.
+
+P4 — complete
+
+Receipts and chain per SPEC §17 P4: screens/Receipts.tsx (§10's screen, §11.5's
+read-aloud), seedDemo in state/receipts.ts (§12.2), and unit tests locking §9.2's
+sha256Hex and verifyChain. The store and the hashing themselves landed in P3 —
+P3 needed addReceipt for §11.1 step 8 and declined to split a six-line function
+across phases — so P4 adds no hashing code. The tests exist to LOCK it.
+
+Decisions referred to the user (the spec was ambiguous or silent on each):
+- Test runner. The repo had none, and §2 pins the stack while §19 bans added
+  dependencies. Chose Node's built-in `node --test`: zero new packages, and Node
+  24 strips TypeScript natively. Two costs, both accepted: state/receipts.ts's
+  import of ../lib/hash gains a .ts extension, because Node's ESM loader does no
+  extension search (allowImportingTsExtensions in tsconfig covers it, and Vite
+  and esbuild resolve the explicit extension unchanged); and running the tests
+  now needs Node ≥22.6 where §2 only promises ≥20. §3's pinned script list gains
+  "test" — CLAUDE.md permits unit tests, and a test needs an entry point.
+- §11.5's "auto". The template `"{Weekday}: {action}, confirmed by {method}."`
+  with (method "auto" → "filed automatically") substituted literally produces
+  "confirmed by filed automatically", which is not English and is spoken aloud
+  (Appendix A beat 6). Agreed the whole clause is replaced:
+  "Tuesday: Scam letter filed, filed automatically."
+- The `#a3f9…` chip is aria-hidden. §10 lists it as a row element, but §15's
+  TalkBack item 9 wants receipts to read as full sentences and a hex fragment is
+  not one. It is a visual affordance for the tamper story, so it stays out of the
+  accessibility tree — the same treatment Settings' "→", the Quiet toggle track
+  and Post Box's masking bar already get.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- "Broken at entry {n}" prints brokenAt verbatim — the 0-based array index. §9.2
+  names the field `index` and §17 P4 asks for "the exact broken index"; P3's own
+  verification already speaks 0-based.
+- The broken banner posts "Broken at entry {n}" through announce(), not speak():
+  §10 gives a spoken line to the intact case only, and §7.1/§7.2 set the
+  precedent that composed lines go straight to aria-live because routing them
+  through speak() would speak them. Intact speaks chain_ok, which mirrors itself.
+- Both banner glyphs (✓ ✗) are aria-hidden; the words carry the meaning.
+- Method renders sentence-case (Double-tap, Auto), following Home.tsx's
+  categoryLabel(), which capitalises tags citing §4's "sentence case everywhere".
+- §11.5's {n} is a digit, while §7.1/§7.2's composed lines spell counts as words
+  — each follows its own section's literal. A count of 1 therefore reads
+  "1 receipts", exactly as P3 rendered §10's "1 items hidden on device": the spec
+  pins the template and pluralising it would invent a decision.
+- "{Weekday}" is the full name (Saturday), matching §7.2's own "One unusual
+  payment on Saturday."
+- "the latest ≤5" is read newest-first, matching §10's list order.
+- One speak() per composed sentence; §6.3's queue exists for that sequencing.
+- readReceiptsAloud() is exported from screens/Receipts.tsx so P6's §11.6
+  "receipt" intent calls this implementation instead of composing its own. §3's
+  tree has no module for it and a state module is the wrong home for spoken copy.
+- seedDemo's card receipt takes method "double-tap". §11.1 step 8's method is
+  whatever the user confirmed with, and §11.2 hard-codes "double-tap" for the
+  analogous demo receipt. It appends rather than replacing — §12.2 lists "Reset
+  receipts" as a separate control.
+- Both Receipts buttons are 48px pills, not 56px: §10 names 56px explicitly where
+  it wants it (Post Box's two buttons, §9.1's Confirm) and does not here.
+- No UI for seedDemo/reset in P4. §12.2's panel is P6, and P3's temporary
+  Settings control already owes a deletion before P7; adding a second one to
+  delete would be worse than none.
+
+FINDING — zustand reads window.localStorage, not the global:
+  zustand v5 defaults to createJSONStorage(() => window.localStorage)
+  (middleware.mjs:332). Node has no `window` at all, so the getter throws,
+  createJSONStorage swallows it and persist silently drops to no storage,
+  warning on every write. Stubbing globalThis.localStorage — which is what Node's
+  own --experimental-webstorage would provide — does nothing. The test stub
+  therefore hangs off `window`.
+
+FINDING — one test was passing for the wrong reason:
+  "rewriting the genesis prevHash breaks entry 0" still passed with verifyChain's
+  prevHash link check disabled, because prevHash is itself part of the preimage,
+  so editing it also breaks that entry's own digest. The link check was untested.
+  Added "a re-hashed tamper is caught by the next entry's link": edit entry 1 and
+  recompute its digest correctly, and only entry 2's prevHash catches it. That is
+  the case that makes these receipts a chain rather than a checksum, and it is
+  the only one that fails when the link check is removed.
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness; speech
+was wrapped from outside, so no debug hooks were added to the shipped code):
+- tsc --noEmit clean; npm run build ok (1053 modules, unchanged — the .ts import
+  specifier resolves through Vite untouched); npm test 10/10
+- the tests provably fail when they should: swapping two fields in §9.2's
+  preimage fails "each hash is SPEC 9.2's pipe-joined preimage" (and only that
+  test — the chain stays internally consistent, which is exactly why an external
+  preimage assertion is needed); disabling the prevHash link check fails the
+  re-hashed-tamper test
+- §10 order on /receipts: Read my receipts · Verify chain · banner absent until
+  run · list or empty state; body aria order still banner · main · navigation ·
+  status, exactly one h1
+- §17 P4's criterion, from outside: a valid 3-entry chain written straight into
+  localStorage renders 3 rows and verifies "✓ Chain intact", with chain_ok
+  reaching speechSynthesis as "Chain verified. No one has rewritten history."
+  Hand-editing entry 0, 1 and 2 in localStorage gives "✗ Broken at entry 0", "1"
+  and "2" respectively. (The row count is asserted before the intact banner: an
+  empty chain also verifies intact, so without it the check would pass on a seed
+  that never landed.)
+- row rendering: "Replacement card ordered / Arriving in 5 working days to home
+  address / Mon 6 Jul, 14:32 · Double-tap · #a841…0e9e" — §10's own example
+  timestamp reproduced verbatim; list newest-first; the chip is absent from the
+  aria snapshot and present on screen
+- §11.5: "You have 3 receipts." then "Saturday: Card payment approved, confirmed
+  by double-tap." / "Tuesday: Scam letter filed, filed automatically." /
+  "Monday: Replacement card ordered, confirmed by double-tap." — composed at
+  runtime through speak({text}), so via /api/tts and its speechSynthesis fallback
+- with six receipts: one count line plus exactly five, newest-first, oldest
+  omitted
+- Quiet Mode: Read my receipts and Verify both speak nothing, the live region
+  still carries every line, and the banner still renders
+- the broken path posts "Broken at entry 1" to aria-live and speaks nothing
+- seedDemo: writes exactly two, in §12.2's order, with payloads compared
+  programmatically against the addReceipt calls extracted from SPEC.md itself
+  (not retyped) — byte-identical including the U+00B7 in "Prize-draw pattern ·
+  214 reports this month"; genesis prevHash on the first, the second linking to
+  it, chain verifies; reset() empties it
+- no regression on all five routes: zero serious/critical axe violations, every
+  named control ≥48×48, zero JS errors. The only network failures in the whole
+  walk are /api/tts 404s — §6.3 step 5's expected fallback path, since
+  `vite preview` serves no /api and no fixed-line MP3s are recorded yet
+
+Note for P7: §16 runs a fresh browser context, so penny.receipts.v1 is empty and
+the EMPTY STATE is what gets baselined for /receipts.
+
+FIVE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P4):
+- §13.2's real /api/tts is still unassigned to any phase (P2's finding, unchanged).
+  It has to land somewhere before filming or Penny never uses the ElevenLabs voice.
+- P6 must delete P3's temporary Settings armed-letter control BEFORE P7 writes any
+  baseline. Its five radio inputs are also 20×20, the only sub-48px controls in
+  the app; both problems go away together.
+- P6's DirectorPanel is the only caller seedDemo and reset will ever have — they
+  ship with no UI in P4.
+- §14 pins includeAssets to ["audio/*.mp3", "icons/*"], which covers neither
+  .wasm.js nor .traineddata.gz; P7's "installed PWA passes scenario D offline"
+  needs public/tesseract/* precached (P3's finding, unchanged).
+- P7's check.mjs still needs a deterministic answer to the aria-live race P2 and
+  P3 flagged. P4 adds to it: the live region now also carries verify and
+  read-aloud text, though only after a button press, so the route walk itself
+  does not trigger it.
