@@ -568,3 +568,189 @@ FIVE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P4):
   P3 flagged. P4 adds to it: the live region now also carries verify and
   read-aloud text, though only after a button press, so the route walk itself
   does not trigger it.
+
+P5 — complete
+
+Tap & Tell, Scam Shield and Quiet Mode per SPEC §17 P5: components/TapTellSheet.tsx
+(§11.2), components/TextCard.tsx (§11.3), the scam flow in screens/PostBox.tsx
+(§11.4), the text-card stack and enterQuietMode() in lib/audio.ts, director.ts's
+two pushes (§12.2), and both mounts in App.tsx.
+
+§11.3's matrix was already three rows out of four: earcons.ts and haptics.ts
+never consulted quietMode, so the Glance, playWeek, vibration and the fallback
+blips have been surviving Quiet Mode since P2. P5's only matrix code is the
+TextCard render and `quiet_on`; the rest of §11.3 was a verification job.
+
+Decisions referred to the user (in each case the spec states two things; all
+four were resolved on the strict reading):
+- `quiet_on` ordering. §11.3 says toggling ON "plays quiet_on as the final
+  spoken line", but §6.3 step 2 suppresses without exception. Agreed: speak it,
+  THEN raise the flag — the only ordering that leaves the line audible, and
+  literally what "final" means. Cost, accepted: the toggle's aria-pressed and
+  amber fill lag the tap by the length of the line (~2s), which Appendix A beat
+  3 films. Rejected alternative: an escape hatch inside speak(), which §6.3
+  step 2 admits none of.
+- Scam Summary replay. §11.1 step 6 says "Summary → summary_spoken", while §5.3
+  calls the scam fixture's summary_spoken "superseded in the UI by the fixed
+  scam_filed line" and §11.4 says that line "replaces the summary". Agreed:
+  scam_filed IS that letter's summary — the first reading and every replay from
+  the mode switch. Consequence: SCENARIOS.scam.summary_spoken is now spoken
+  nowhere in the app; it survives only as fixture data.
+- TapTellSheet has no Confirm button. §11.2's contents list is merchant · amount
+  · "Double-tap to approve" region · Cancel, where §9.1 gives ConfirmSheet a
+  56px Confirm button. Agreed: exactly §11.2's four elements. That is also why
+  §11.2 hard-codes the receipt's method as "double-tap" — there is no other way
+  to approve. Recorded consequence: approve is unreachable by keyboard or
+  switch, and focus lands on Cancel on open, the only focusable element. A real
+  §15 gap, entered deliberately rather than papered over.
+- TextCard keeps role="status". §11.3 pins the role and §6.3 step 1 mirrors
+  every string to the live region, so in Quiet Mode each line reaches a screen
+  reader twice. §15's TalkBack item 5, "announced once, not repeatedly", is read
+  as: the card must not re-announce on re-render or timer tick. Flagged for the
+  pre-filming TalkBack pass, where it gets judged on the device.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- enterQuietMode() lives in lib/audio.ts. Both §10's Header toggle and §10's
+  Settings row turn the same setting on, so the speak-then-flip sequence needs
+  one home; the gateway that owns the suppression owns the exception to it, and
+  putting it there avoids a settings.ts → audio.ts → settings.ts import cycle.
+  It carries its own re-entrancy guard, so taps landing inside the line cannot
+  queue a second `quiet_on`.
+- The card stack sits in audio.ts beside `announce`, consumed with
+  useSyncExternalStore — P2's precedent, so no fifth store appears beside §3's
+  four. The array is swapped rather than mutated, since useSyncExternalStore
+  compares snapshots by identity.
+- speak() does not await the card. §6.3 step 2 says *return*, and §11.3 says
+  cards *stack*, so a burst puts one card up per line at once — §11.5's
+  read-aloud can raise six. No cap is invented.
+- The TextCard host renders null when the stack is empty, not an empty wrapper,
+  and TapTellSheet exists only while a push is pending. Neither is therefore
+  visible to §16's route walk.
+- Dialogs outrank status cards: cards z-20, sheets z-30 (ConfirmSheet moved off
+  z-10). In Quiet Mode a ConfirmSheet's own read-back becomes a card, and a
+  modal must never end up underneath one.
+- pendingTap is not persisted. §12.2 persists the director, but a pending push
+  surviving a reload would raise a payment sheet on load with nothing behind it,
+  so partialize keeps armedLetter only — the shape receipts.ts already uses.
+- TapTellSheet fires haptic("attention") in its own mount effect rather than in
+  the pushing control, so P6's DirectorPanel inherits it. ConfirmSheet already
+  owns its on-open speak(readback); this is the same shape.
+- In Quiet Mode TapTellSheet mirrors its line with announce(), not speak().
+  §11.2 says "the sheet is the text card", so going through the gateway would
+  stack a second card on top of a sheet already showing the same thing. §7.1/7.2
+  set the precedent for posting straight to aria-live.
+- The sheet's accessible name is "Approve card payment" — §11.2 gives none, and
+  this names the outcome (§4) in the action-name family of the receipt it writes.
+- The Quiet caption row goes last, after Cancel, so it displaces none of §11.2's
+  four listed elements.
+- §9.1's dialog behaviour (focus first focusable, restore the invoker, Escape,
+  Tab trap) was extracted into useDialogSheet(), exported from ConfirmSheet.tsx
+  and used by both sheets. "TapTellSheet follows the same dialog rules" is then
+  true by construction rather than by copy, and no module appears outside §3's
+  tree — the precedent P4 set with readReceiptsAloud.
+- §11.4's "danger 'Suspected scam' tag" is the existing tag restyled, not a new
+  element: §5.3 already gives the scam fixture letter_type "Suspected scam",
+  which §10 already places. So the scam card adds exactly one element to §10's
+  order — the "Receipt saved" footer, and only on a scam result.
+- The scam receipt is written without awaiting scam_filed. The write is silent
+  and invisible, so making it wait ~3s for the line buys nothing, and the order
+  the user perceives is still §11.4's.
+- No animation on the cards. §4's motion rule binds animation that is added;
+  adding none is simpler than wrapping one in prefers-reduced-motion.
+- No new unit tests. P4's node --test covers §9.2's pure logic; everything P5
+  adds is DOM and side-effects, and is verified in the browser instead.
+
+FINDING — the splash Glance overwrites the live region ~1.5s after unlock:
+  §6.1 ends by running glance(), and §7.1 posts its completion line on a timer
+  after the earcon. Any aria-live assertion made in that window is silently
+  overwritten by "Steady. One bill this week. One unusual payment." — measured
+  here at 1043ms after the tap, against a scam flow that completed at 595ms.
+  This is P2's race met head-on rather than in theory. The harness waits the
+  line out before asserting anything; P7's check.mjs still needs a deterministic
+  answer, and this is now the third phase to say so.
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness; the
+speech, vibration and WebAudio surfaces were wrapped from outside, so no debug
+hooks were added to the shipped code):
+- tsc --noEmit clean; npm run build ok (1055 modules); npm test 10/10
+- §6.1's invariant survives P5's new import of lib/audio into Header.tsx:
+  0 AudioContexts and 0 speechSynthesis calls before the splash tap, exactly 1
+  after. tone is still absent from the 220 KB entry chunk (no ToneAudioNode, no
+  createOscillator) and present in the 336 KB lazy chunk
+- scenario B end to end (Quiet ON, push Coffee): vibrate [400] on the push and
+  [80,60,80] on approve · zero speechSynthesis calls throughout · the sheet
+  carries "The Coffee House", "£4.85", the double-tap region, Cancel and the
+  "Quiet Mode" caption, and Cancel is its only button · tap_coffee still reaches
+  aria-live · no redundant card while the sheet is up · after the double-tap the
+  card reads exactly "Approved. Receipt saved." (§6.2's payment_done — §12.3 B's
+  "Approved · Receipt saved" is prose, not the string) · exactly one receipt
+  with §11.2's payload and method "double-tap" · genesis prevHash · chain
+  verifies intact
+- the TicketPoint push on the speech path: tap_unknown spoken, no Quiet caption,
+  payment_done spoken, receipt details "TicketPoint Ltd · £68.20"
+- scenario C end to end (armed Scam): vibrate [40,40,40,40,40] · scam_filed
+  spoken and nothing else — no summary_spoken, no done_receipt · zero
+  /api/read-letter calls · card background computes to
+  oklab(… / 0.12), i.e. §11.4's 12%, and the tag to rgb(255,92,92) · the tag
+  text is §5.3's letter_type · footer "Receipt saved" · masking still ran on the
+  way through ("7 items hidden on device") · exactly one receipt whose payload
+  is byte-identical to the addReceipt call extracted from SPEC.md itself, not
+  retyped — including the U+00B7 — with method "auto"
+- scenario C in Quiet Mode: the alert buzz still fires, zero speech, scam_filed
+  lands as a text card and still reaches aria-live, the receipt is still written
+- mode switch on the scam letter: Exact speaks the letter verbatim, Summary
+  replays scam_filed
+- §11.3's matrix, row by row, with Quiet ON: the Glance still sounds C4, E4, G4,
+  A5, C5 and F#5 · playWeek still allocates nine panners with credits at −0.7
+  (×2) and debits at +0.7 (×7) · vibration still fires · with navigator.vibrate
+  removed, no vibrate call and the 800Hz attention blip still plays · zero
+  speech in every case · the live region still carries every composed line
+- `quiet_on`: the toggle speaks "Quiet Mode. I'll whisper." while the flag is
+  still down, the button reads aria-pressed=true once the line ends, and the
+  NEXT line is suppressed into a card — which is what makes it the final spoken
+  line. Three taps dispatched inside one line queue exactly one `quiet_on`
+- both sheets' dialog rules: focus moves inside on open, Tab stays trapped,
+  aria-modal and an accessible name are present, Escape speaks cancel_ok and
+  writes no receipt, and focus returns to the invoking button. P3's ConfirmSheet
+  path was re-run whole (order card → read-back mirrored with "42 Lavender
+  Grove" → double-tap → §11.1 step 8's payload) to prove the hook extraction is
+  inert
+- TextCard: role="status", 22px, background rgb(35,43,53) = --surface-raised,
+  bottom edge above the TabBar's top edge, dismissed on tap, still up at ~4.3s
+  and gone by ~6.5s
+- no regression on all five routes: #root children header · main · nav · div,
+  aria landmarks banner · main · navigation · status, exactly one h1, zero
+  serious/critical axe violations, every button and link ≥48×48, zero console
+  errors. The sheet and the card stack render nothing on every route, so P7's
+  baselines are unaffected
+- the only 404s in the whole walk are /audio/*.mp3 and /api/tts — §6.3 step 5's
+  expected fallback path, since `vite preview` serves no /api and no fixed-line
+  MP3s are recorded yet
+- VITE_BREAK_LAYOUT=1 renders ["Play my week","Play the Glance"]; unset renders
+  the §10 order (both builds rendered, not grepped)
+
+Not verified here (needs the device, before filming):
+- whether decision 4's double announcement is tolerable under real TalkBack.
+  This is the one P5 decision that could still be wrong in practice, and §15's
+  TalkBack pass is where it gets settled — the fix, if needed, is one attribute.
+- that navigator.vibrate produces §8's patterns and that speechSynthesis is
+  audible. Headless Chromium has no motor and no voices, so the harness asserts
+  the call sites, not the output (unchanged from P2).
+
+FIVE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P5):
+- §13.2's real /api/tts is still unassigned to any phase in §17 (P2's finding,
+  unchanged). It has to land somewhere before filming or Penny never uses the
+  ElevenLabs voice at runtime.
+- P6 must delete the temporary Settings control BEFORE P7 writes any baseline,
+  and it is bigger now: five armed-letter radios AND §12.2's two push buttons,
+  under the legend "Director (temporary — P6)". The pushes were added as 48px
+  pills precisely so P4's "the radios are the only sub-48px controls in the app"
+  stays true until the whole block goes.
+- P6's DirectorPanel is the only caller seedDemo and reset will ever have; it
+  now also owns armedLetter and both pushes, all of which already exist in
+  state/director.ts.
+- §14 pins includeAssets to ["audio/*.mp3", "icons/*"], which covers neither
+  .wasm.js nor .traineddata.gz; P7's "installed PWA passes scenario D offline"
+  needs public/tesseract/* precached (P3's finding, unchanged).
+- P7's check.mjs still needs a deterministic answer to the aria-live race — see
+  P5's finding above, which measures it rather than predicting it.

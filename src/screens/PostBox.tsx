@@ -6,6 +6,7 @@ import type { Letter } from "../data/letters";
 import type { FixedLineId } from "../data/voiceLines";
 import { speak } from "../lib/audio";
 import { captureCanvas, toBase64 } from "../lib/capture";
+import { haptic } from "../lib/haptics";
 import { maskImage, startWorker } from "../lib/ocrMask";
 import { useDirector } from "../state/director";
 import { useReceipts } from "../state/receipts";
@@ -22,13 +23,17 @@ type Reading = Omit<Letter, "key">;
 
 // SPEC 11.1 step 6: "fixtures use their fixed audio ids; live API letters use
 // runtime TTS". SPEC 5.3 marks which summary_spoken values are recorded lines.
-// scam has none — SPEC 5.3 says its summary is "superseded in the UI by the
-// fixed scam_filed line", which is SPEC 11.4, and SPEC 17 puts that in P5.
-const SUMMARY_LINE: Record<Letter["key"], FixedLineId | null> = {
+//
+// scam maps to `scam_filed` rather than to its own summary_spoken: SPEC 5.3
+// calls that string "superseded in the UI by the fixed scam_filed line" and
+// SPEC 11.4 says the line "replaces the summary". So scam_filed IS this
+// letter's summary — both the first reading and every Summary replay from the
+// mode switch — and SCENARIOS.scam.summary_spoken is never spoken anywhere.
+const SUMMARY_LINE: Record<Letter["key"], FixedLineId> = {
   card: "summary_card",
   nhs: "summary_nhs",
   pin: "pin_privacy",
-  scam: null,
+  scam: "scam_filed",
 };
 
 // SPEC 11.1 step 3.
@@ -156,11 +161,29 @@ export default function PostBox() {
 
   // SPEC 11.1 steps 5 to 7 and 9, in order.
   async function announce(letter: Reading, summaryId: FixedLineId | null) {
-    // Step 9: scam_alert hands off to SPEC 11.4 — the alert buzz, the danger
-    // tint, `scam_filed` replacing the summary and the silent auto-receipt.
-    // SPEC 17 assigns all of that to P5, so P3 speaks nothing here rather than
-    // speaking a summary SPEC 5.3 says is superseded. SEAM: P5.
-    if (letter.required_action === "scam_alert") return;
+    // Step 9 hands scam_alert to SPEC 11.4: "haptic("alert") → result card
+    // tinted --danger at 12% opacity with a danger "Suspected scam" tag → play
+    // scam_filed (replaces the summary) → silently addReceipt(...) → card
+    // footer text "Receipt saved". No done_receipt line (the scam line already
+    // said "filed")."
+    //
+    // The tint and the tag are rendered below off required_action; the tag
+    // needs no new element because SPEC 5.3 already gives this fixture
+    // letter_type "Suspected scam", which SPEC 10 already places.
+    //
+    // The speech is not awaited before the write: the receipt is silent and
+    // invisible, so making it wait ~3s for the line to finish would buy
+    // nothing, and the order the user perceives is still SPEC 11.4's.
+    if (letter.required_action === "scam_alert") {
+      haptic("alert");
+      void speak({ id: "scam_filed" });
+      await useReceipts.getState().addReceipt({
+        action: "Scam letter filed",
+        details: "Prize-draw pattern · 214 reports this month",
+        method: "auto",
+      });
+      return;
+    }
 
     if (letter.sensitive_content) {
       // Step 5: "play pin_privacy first (for the pin fixture this IS the
@@ -201,6 +224,10 @@ export default function PostBox() {
     void speak({ id: "done_receipt" });
   }
 
+  // SPEC 11.4's danger treatment. SPEC 4 reserves --danger for scam and tamper
+  // and nothing else.
+  const scam = result?.letter.required_action === "scam_alert";
+
   return (
     <>
       {/* SPEC 10: a styled <label> wrapping an sr-only file input, so the
@@ -237,9 +264,14 @@ export default function PostBox() {
       )}
 
       {status === "result" && result && (
-        <section className="mt-4 rounded-2xl bg-surface p-4">
+        <section className={`mt-4 rounded-2xl p-4 ${scam ? "bg-danger/12" : "bg-surface"}`}>
           <h2 className="text-card">{result.letter.sender}</h2>
-          <p className="mt-1 text-caption text-text-dim">{result.letter.letter_type}</p>
+          {/* SPEC 11.4's "danger 'Suspected scam' tag" is this tag restyled,
+              not a new element: SPEC 5.3 already gives the scam fixture
+              letter_type "Suspected scam". */}
+          <p className={`mt-1 text-caption ${scam ? "text-danger" : "text-text-dim"}`}>
+            {result.letter.letter_type}
+          </p>
 
           <img
             src={result.preview}
@@ -280,6 +312,11 @@ export default function PostBox() {
               Order replacement card
             </button>
           )}
+
+          {/* SPEC 11.4's "card footer text 'Receipt saved'". It stands in for
+              the `done_receipt` line the scam flow deliberately does not
+              speak — scam_filed already said "I've filed it for you". */}
+          {scam && <p className="mt-4 text-caption text-text-dim">Receipt saved</p>}
         </section>
       )}
 

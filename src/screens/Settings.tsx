@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import { enterQuietMode } from "../lib/audio";
 import { useSettings } from "../state/settings";
 import { useDirector } from "../state/director";
-import type { ArmedLetter } from "../state/director";
+import type { ArmedLetter, TapPush } from "../state/director";
 
 // SPEC 10 specifies aria-pressed for the Header's Quiet Mode toggle, so the
 // three Settings toggles use the same pattern. The track is aria-hidden, which
@@ -42,15 +43,16 @@ function Toggle({
 
 // TEMPORARY — REMOVE IN P6.
 //
-// SPEC 11.1 step 3 reads director.armedLetter, but SPEC 12.2's panel is P6, so
-// P3 has no way to arm a letter and neither filmed scenario (SPEC 12.3 A and D)
-// could be reached. This is the smallest stand-in: SPEC 12.2's own five radio
-// labels and nothing else.
+// SPEC 12.2's director panel is P6, but two of its controls are needed earlier:
+// SPEC 11.1 step 3 reads director.armedLetter (P3, scenarios A and D) and
+// SPEC 11.2's sheet is raised only by a push (P5, scenario B). Without them
+// three of the four filmed scenarios are unreachable. This is the smallest
+// stand-in: SPEC 12.2's own five radio labels and two push labels, nothing else.
 //
 // It sits AFTER "About Penny" so it reorders none of SPEC 10's Settings
-// elements. It must be deleted when DirectorPanel.tsx lands, BEFORE P7 writes
-// any Layout Lock baseline — otherwise SPEC 16 enshrines a debug control in the
-// shipped accessibility tree.
+// elements. ALL OF IT must be deleted when DirectorPanel.tsx lands — the radios
+// and both push buttons — BEFORE P7 writes any Layout Lock baseline, otherwise
+// SPEC 16 enshrines a debug control in the shipped accessibility tree.
 const ARMED: { value: ArmedLetter; label: string }[] = [
   { value: "live", label: "Live API" },
   { value: "card", label: "Card" },
@@ -59,13 +61,20 @@ const ARMED: { value: ArmedLetter; label: string }[] = [
   { value: "pin", label: "PIN" },
 ];
 
-function ArmedLetterControl() {
+// SPEC 12.2's labels verbatim, so P6's panel inherits them unchanged.
+const PUSHES: { value: TapPush; label: string }[] = [
+  { value: "coffee", label: "Push: Coffee £4.85" },
+  { value: "ticketpoint", label: "Push: TicketPoint £68.20" },
+];
+
+function DirectorStandIn() {
   const armedLetter = useDirector((state) => state.armedLetter);
   const setArmedLetter = useDirector((state) => state.setArmedLetter);
+  const pushTap = useDirector((state) => state.pushTap);
 
   return (
     <fieldset className="mt-6 border-t border-hairline pt-2">
-      <legend className="text-caption text-text-dim">Armed letter (temporary — P6)</legend>
+      <legend className="text-caption text-text-dim">Director (temporary — P6)</legend>
       {ARMED.map((option) => (
         <label
           key={option.value}
@@ -82,6 +91,19 @@ function ArmedLetterControl() {
           {option.label}
         </label>
       ))}
+
+      {/* 48px pills, not the radios' 20×20: P4 flagged those as the only
+          sub-48px controls in the app (SPEC 4), and this must not add to it. */}
+      {PUSHES.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => pushTap(option.value)}
+          className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-full border border-amber px-6 text-body text-amber"
+        >
+          {option.label}
+        </button>
+      ))}
     </fieldset>
   );
 }
@@ -95,7 +117,17 @@ export default function Settings() {
   return (
     <>
       <ul>
-        <Toggle label="Quiet Mode" checked={quietMode} onChange={setQuietMode} />
+        {/* Turning Quiet Mode ON goes through enterQuietMode() here for the
+            same reason the Header does: SPEC 11.3's `quiet_on` has to be spoken
+            before the flag rises, and this is the same setting. */}
+        <Toggle
+          label="Quiet Mode"
+          checked={quietMode}
+          onChange={(value) => {
+            if (value) void enterQuietMode();
+            else setQuietMode(false);
+          }}
+        />
         <Toggle label="Voice input" checked={voiceInput} onChange={setVoiceInput} />
         <Toggle label="Demo mode" checked={demoMode} onChange={setDemoMode} />
       </ul>
@@ -113,7 +145,7 @@ export default function Settings() {
       </p>
       <p className="mt-2 text-caption text-text-dim">Prototype v1.0</p>
 
-      <ArmedLetterControl />
+      <DirectorStandIn />
     </>
   );
 }

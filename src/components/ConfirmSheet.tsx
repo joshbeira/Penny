@@ -21,8 +21,50 @@ const DOUBLE_TAP_MS = 300;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCancel }: Props) {
+// SPEC 9.1's dialog rules: "focus-trapped … Escape = cancel, focus returns to
+// the invoking button on close".
+//
+// Exported because SPEC 11.2's TapTellSheet follows the same rules. Sharing the
+// implementation makes that true by construction rather than by copy, and adds
+// no module outside SPEC 3's tree — the precedent P4 set by exporting
+// readReceiptsAloud from screens/Receipts.tsx for P6 to reuse.
+export function useDialogSheet(onEscape: () => void) {
   const sheet = useRef<HTMLDivElement>(null);
+
+  // The invoker is captured here rather than passed in, so no caller can
+  // forget to restore focus.
+  useEffect(() => {
+    const invoker = document.activeElement as HTMLElement | null;
+    sheet.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    return () => invoker?.focus();
+  }, []);
+
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onEscape();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const targets = Array.from(sheet.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+    if (targets.length === 0) return;
+
+    const first = targets[0];
+    const last = targets[targets.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  return { sheet, onKeyDown };
+}
+
+export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCancel }: Props) {
   const lastTap = useRef(0);
   // One decision per sheet. Without this a fast double-tap *on* the Confirm
   // button would fire the button's onClick and then the sheet's double-tap
@@ -43,6 +85,8 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
     onCancel();
   };
 
+  const { sheet, onKeyDown } = useDialogSheet(cancel);
+
   // SPEC 9.1: "On open, speak(readback)." Both id and text are passed by
   // SPEC 11.1 step 8 — audio.ts plays the recording and mirrors the text.
   useEffect(() => {
@@ -50,37 +94,6 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
     // Deliberately once per mount: the read-back must not repeat on re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // SPEC 9.1: "focus returns to the invoking button on close". Captured here
-  // rather than passed in, so no caller can forget it.
-  useEffect(() => {
-    const invoker = document.activeElement as HTMLElement | null;
-    sheet.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-    return () => invoker?.focus();
-  }, []);
-
-  // SPEC 9.1: "focus-trapped … Escape = cancel".
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      cancel();
-      return;
-    }
-    if (event.key !== "Tab") return;
-
-    const targets = Array.from(sheet.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
-    if (targets.length === 0) return;
-
-    const first = targets[0];
-    const last = targets[targets.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
 
   const onPointerDown = () => {
     const now = Date.now();
@@ -97,6 +110,10 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
   // button. `actionLabel` names the dialog — SPEC 9.1 gives the button itself
   // the literal label "Confirm", and SPEC 4 wants one name per action all the
   // way through, so the name belongs on the dialog.
+  //
+  // z-30 keeps the sheet above SPEC 11.3's text cards (z-20): in Quiet Mode the
+  // read-back itself becomes a card, and a modal must never end up underneath
+  // one.
   return (
     <div
       ref={sheet}
@@ -105,7 +122,7 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
       aria-label={actionLabel}
       onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
-      className="fixed inset-x-0 bottom-0 z-10 rounded-t-2xl bg-surface-raised p-4"
+      className="fixed inset-x-0 bottom-0 z-30 rounded-t-2xl bg-surface-raised p-4"
     >
       <p className="text-card">{readback.text}</p>
 

@@ -108,6 +108,49 @@ export function subscribeAnnouncement(listener: () => void): () => void {
 }
 
 // ---------------------------------------------------------------------------
+// Text cards (SPEC 11.3, SPEC 6.3 step 2)
+// ---------------------------------------------------------------------------
+
+// Quiet Mode replaces speech with cards, so the stack belongs to the gateway
+// that suppresses the speech. It sits here beside the live region for the same
+// reason that does: audio.ts is the non-component module every speaker shares,
+// and SPEC 3's state/ directory has exactly four stores.
+//
+// The array is swapped rather than mutated — TextCard.tsx reads it through
+// useSyncExternalStore, which compares snapshots by identity.
+export type TextCardEntry = { id: number; text: string };
+
+let cards: TextCardEntry[] = [];
+let nextCardId = 1;
+const cardListeners = new Set<() => void>();
+
+function emitCards(): void {
+  cardListeners.forEach((listener) => listener());
+}
+
+function pushCard(text: string): void {
+  cards = [...cards, { id: nextCardId++, text }];
+  emitCards();
+}
+
+// SPEC 11.3: "auto-dismiss 6s or on tap". Both routes land here.
+export function dismissCard(id: number): void {
+  cards = cards.filter((card) => card.id !== id);
+  emitCards();
+}
+
+export function getCards(): TextCardEntry[] {
+  return cards;
+}
+
+export function subscribeCards(listener: () => void): () => void {
+  cardListeners.add(listener);
+  return () => {
+    cardListeners.delete(listener);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Unlock (SPEC 6.1)
 // ---------------------------------------------------------------------------
 
@@ -207,6 +250,32 @@ export function speak(input: SpeakInput): Promise<void> {
   return next;
 }
 
+// SPEC 11.3: "Toggling ON plays `quiet_on` as the final spoken line."
+//
+// Step 2 above suppresses unconditionally, so the only ordering that leaves
+// that line audible is to speak it BEFORE the flag goes up — which is exactly
+// what "final" means. The visible cost is that the toggle's pressed state lags
+// the tap by the length of the line; the alternative would be an escape hatch
+// in the gateway, and SPEC 6.3 step 2 admits none.
+//
+// It lives here rather than in the two components that call it (SPEC 10's
+// Header toggle and SPEC 10's Settings row are the same setting) so there is
+// one implementation, and here rather than in state/settings.ts so no import
+// cycle forms with this module.
+let entering = false;
+
+export async function enterQuietMode(): Promise<void> {
+  // Without this, a second tap during the ~2s line queues a second `quiet_on`.
+  if (entering) return;
+  entering = true;
+  try {
+    await speak({ id: "quiet_on" });
+    useSettings.getState().setQuietMode(true);
+  } finally {
+    entering = false;
+  }
+}
+
 async function run(input: SpeakInput): Promise<void> {
   // When both are given (SPEC 11.1 step 8's read-back), `text` is the exact
   // on-screen wording and the id is the recording of it, so the mirror takes
@@ -217,9 +286,18 @@ async function run(input: SpeakInput): Promise<void> {
   // SPEC 6.3 step 1 — ALWAYS, in every mode. Screen-reader parity.
   announce(text);
 
-  // SPEC 6.3 step 2. P5 renders the TextCard here (SPEC 11.3); the suppression
-  // itself is what P2 owes.
-  if (useSettings.getState().quietMode) return;
+  // SPEC 6.3 step 2: "render a TextCard with the text; play no speech; return."
+  // The return is literal — nothing awaits the card — which is why SPEC 11.3
+  // says cards *stack*: a burst like SPEC 11.5's read-aloud puts one up per
+  // line, all at once, each running its own 6s timer.
+  //
+  // Earcons and haptic fallback blips are exempt because they never come
+  // through here (SPEC 11.3's matrix keeps them audible in Quiet Mode); they
+  // route through earcons.ts and haptics.ts.
+  if (useSettings.getState().quietMode) {
+    pushCard(text);
+    return;
+  }
 
   // SPEC 6.1 bars any audio API before the splash tap. speak() is only
   // reachable afterwards, but the invariant is load-bearing enough to enforce.
