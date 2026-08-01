@@ -755,7 +755,7 @@ FIVE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P5):
 - P7's check.mjs still needs a deterministic answer to the aria-live race — see
   P5's finding above, which measures it rather than predicting it.
 
-P6 — complete except the MP3s (blocked on an API key permission, see below)
+P6 — complete
 
 Journey, Director and voice input per SPEC §17 P6: components/DirectorPanel.tsx
 (§12.1 + §12.2), screens/Journey.tsx with Home's era prop and three preset class
@@ -764,18 +764,38 @@ deletion of all seven temporary Settings controls. Also, at the user's
 direction and ahead of §17's own ordering: scripts/generate-voice.mjs (§14) and
 the two P5 findings, which amend §15 and §16.
 
-BLOCKED — the fifteen MP3s are not recorded:
-  scripts/generate-voice.mjs is written and works; public/audio/ is still empty.
-  The supplied ELEVENLABS_API_KEY is valid and carries text_to_speech (a probe
-  returned 200 audio/mpeg with an ID3 header) but NOT voices_read: GET
-  /v1/voices answers 401 "missing the permission voices_read". §13.2's voice
-  resolution is a GET /v1/voices, so "Alice" cannot be resolved and no line can
-  be recorded in the specified voice. Hard-coding a voice id was rejected — it
-  would desync the script from §13.2 and paper over the same failure at runtime,
-  since §13.2's /api/tts resolves the voice the same way on every cold start.
-  FIX: enable voices_read on the key, then `ELEVENLABS_API_KEY=… npm run voice`.
-  Until then every line takes §6.3 step 5's speechSynthesis fallback, which is
-  what P2–P5 verified against, so nothing else in the app is blocked.
+The fifteen MP3s are recorded and committed (public/audio/, 1081 KB). Two things
+had to be fixed first, in order:
+
+WAS BLOCKED — the key lacked voices_read:
+  The supplied ELEVENLABS_API_KEY carried text_to_speech (a probe returned 200
+  audio/mpeg with an ID3 header) but not voices_read, so GET /v1/voices answered
+  401 and §13.2's resolution could not run. Hard-coding a voice id was rejected —
+  it would desync the script from §13.2 and paper over the same failure at
+  runtime, since §13.2's /api/tts resolves the voice the same way on every cold
+  start. The user enabled the permission; both now work.
+
+FINDING — §13.2's "the voice named 'Alice'" no longer matches anything:
+  ElevenLabs now suffixes its premade voices with a descriptor, and the account
+  lists "Alice - Clear, Engaging Educator". An exact string comparison misses it
+  and §13.2's next branch picks the first British voice, which in this account
+  is "George - Warm, Captivating Storyteller" — male. Penny would have silently
+  stopped being the voice the spec names, in every recorded line and every
+  runtime line, across the whole film. Caught because the resolution was run
+  against the real voice list before recording anything.
+  Referred to the user, who chose Alice. The name is now compared with the
+  " - descriptor" suffix stripped, in scripts/generate-voice.mjs and api/tts.ts
+  identically, so the recorded lines and the runtime lines stay one voice.
+  Verified: the run logged "Alice - Clear, Engaging Educator"
+  (Xb7hH8MSUJpSbSDYk0k2), not the fallback.
+
+CONSEQUENCE — §6.3 step 5 is no longer the live path for fixed lines:
+  Since P2 every line took the speechSynthesis fallback, because no MP3 existed
+  and /api/tts was a stub. Now greet is served from /audio/greet.mp3 and
+  speechSynthesis is not called at all for a fixed line; runtime-composed lines
+  (§11.5's read-aloud, Exact/Explain) go through the real /api/tts. Real MP3
+  durations change every timing in the app, so the whole regression sweep and
+  the entire §15 TalkBack checklist were re-run against them — both still green.
 
 Decisions referred to the user (the spec states two things in each case):
 - Voice confirm reaches BOTH sheets and records method "voice". §11.6 says
@@ -968,11 +988,7 @@ navigator.vibrate produces §8's patterns).
   against the real key it answers §13.2's 502 rather than crashing, which is the
   path §6.3 step 5 is built for.
 
-THREE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
-- The fifteen MP3s. Enable voices_read on the ElevenLabs key and run
-  `npm run voice`; the script and the commit are ready for them. The SAME
-  permission is what /api/tts needs to serve a single line at runtime, so one
-  dashboard change unblocks both.
+TWO ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
 - §14 pins includeAssets to ["audio/*.mp3", "icons/*"], which covers neither
   .wasm.js nor .traineddata.gz; P7's "installed PWA passes scenario D offline"
   needs public/tesseract/* precached (P3's finding, unchanged).
@@ -980,3 +996,16 @@ THREE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
   ONE tab across all five routes. The mic button will be in every baseline:
   webkitSpeechRecognition IS defined in Playwright's Chromium, so turning
   Voice input off after the baseline is written would fail lock:check.
+
+STILL OUTSTANDING FOR THE HUMAN, before filming:
+- ANTHROPIC_API_KEY is set nowhere — not in .env, not in Vercel (checked; only
+  ELEVENLABS_API_KEY is there, across Production/Preview/Development). All four
+  §12.3 scenarios still work, because A, C and D are armed to fixtures and skip
+  the network entirely (§11.1 step 3), but §13.1's live path is what backs
+  §10's "Point at any letter — bank or not." Without the key that silently falls
+  back to the card fixture.
+- The device pass. §15 items 1, 2, 4, 5 and 9 are claims about what TalkBack
+  UTTERS and can only be settled on the Android handset, together with P2's and
+  P5's outstanding items (that speechSynthesis is audible — now only relevant
+  for runtime-composed lines — and that navigator.vibrate produces §8's three
+  patterns).
