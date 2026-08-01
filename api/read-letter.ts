@@ -1,9 +1,18 @@
 // SPEC 13.1. Keys are server-side only (SPEC 18) and never reach the client.
 //
 // SPEC 17's phase table assigns this file to no phase — P3 owns its only caller
-// (SPEC 11.1 step 3), so it lands here. With no ANTHROPIC_API_KEY present the
+// (SPEC 11.1 step 3), so it lands here. With no GEMINI_API_KEY present the
 // function answers 502 immediately, which is SPEC 13.1's specified behaviour and
 // the path SPEC 11.1 step 4's fixture fallback is built for.
+//
+// VENDOR: SPEC 13.1 originally specified the Claude API. Changed to Google
+// Gemini at the user's direction — there is no Anthropic credit for this
+// project, and a §13.1 that cannot be called is worse than one that names a
+// different vendor. SPEC 13.1 and SPEC 18 were amended to match. Everything the
+// spec actually constrains is unchanged: the same SYSTEM_PROMPT verbatim, the
+// same masked JPEG, temperature 0, the same seven-key contract, the same five
+// required_action values, and the same "any failure → 502" so SPEC 11.1 step 4's
+// fixture fallback still carries the demo.
 //
 // Typed locally rather than via @vercel/node so no dependency is added beyond
 // SPEC 2, following api/tts.ts.
@@ -38,6 +47,12 @@ const KEYS = [
   "exact_text",
 ];
 
+// SPEC 13.1's model. Flash rather than Pro: this is one image and a short JSON
+// reply on a stopwatch — SPEC 11.1 step 3 aborts the whole call at 8s.
+const MODEL = "gemini-2.5-flash";
+
+const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
 export default async function handler(req: Req, res: Res) {
   // SPEC 13.1: "Accept POST".
   if (req.method !== "POST") {
@@ -45,8 +60,8 @@ export default async function handler(req: Req, res: Res) {
     return;
   }
 
-  const key = process.env.ANTHROPIC_API_KEY;
-  // SPEC 13.1: "Missing ANTHROPIC_API_KEY → immediate 502."
+  const key = process.env.GEMINI_API_KEY;
+  // SPEC 13.1: "Missing GEMINI_API_KEY → immediate 502."
   if (!key) {
     res.status(502).json({ ok: false });
     return;
@@ -68,38 +83,49 @@ export default async function handler(req: Req, res: Res) {
 
   try {
     // SPEC 2: serverless functions use plain fetch — no SDKs.
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
+        "x-goog-api-key": key,
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1024,
-        temperature: 0,
-        system: SYSTEM_PROMPT,
-        messages: [
+        // SPEC 13.1's system prompt, unchanged — Gemini takes it here rather
+        // than as a top-level `system` field.
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [
           {
             role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: "image/jpeg", data: imageBase64 },
-              },
-              { type: "text", text: "Read this letter." },
+            parts: [
+              { inline_data: { mime_type: "image/jpeg", data: imageBase64 } },
+              { text: "Read this letter." },
             ],
           },
         ],
+        generationConfig: {
+          // SPEC 13.1's temperature 0 — a letter must read the same way twice.
+          temperature: 0,
+          // SPEC 13.1 pins max_tokens 1024. Raised because on Gemini the
+          // reasoning tokens are drawn from the SAME budget as the reply, so
+          // 1024 can be spent before a single character of JSON is emitted —
+          // and `exact_text` alone is the whole letter verbatim.
+          maxOutputTokens: 4096,
+          // Belt and braces with the fence stripper below: the system prompt
+          // already forbids fences, and this makes the model emit bare JSON.
+          responseMimeType: "application/json",
+        },
       }),
     });
 
-    if (!response.ok) throw new Error(`Claude API responded ${response.status}`);
+    if (!response.ok) throw new Error(`Gemini API responded ${response.status}`);
 
-    const data = (await response.json()) as { content?: { text?: unknown }[] };
-    const text = data.content?.[0]?.text;
-    if (typeof text !== "string") throw new Error("No text block in the response");
+    const data = (await response.json()) as {
+      candidates?: { content?: { parts?: { text?: unknown }[] } }[];
+    };
+    // SPEC 13.1 reads data.content[0].text; the Gemini equivalent is the first
+    // text part of the first candidate.
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (typeof text !== "string") throw new Error("No text part in the response");
 
     const letter = JSON.parse(stripFences(text)) as Record<string, unknown>;
 

@@ -402,32 +402,35 @@ Armed letter radio group: **Live API / Card / NHS / Scam / PIN** (default Live) 
 
 ### 13.1 `api/read-letter.ts`
 
-`export const config = { api: { bodyParser: { sizeLimit: "6mb" } } };` Default-export `(req, res)`. Accept POST `{ imageBase64: string, mediaType: "image/jpeg" }`. Call the Claude API (reference: https://docs.claude.com/en/api/overview):
+`export const config = { api: { bodyParser: { sizeLimit: "6mb" } } };` Default-export `(req, res)`. Accept POST `{ imageBase64: string, mediaType: "image/jpeg" }`. Call the Google Gemini API (reference: https://ai.google.dev/gemini-api/docs):
 
 ```
-POST https://api.anthropic.com/v1/messages
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
 headers: {
-  "x-api-key": process.env.ANTHROPIC_API_KEY,
-  "anthropic-version": "2023-06-01",
+  "x-goog-api-key": process.env.GEMINI_API_KEY,
   "content-type": "application/json"
 }
 body: {
-  "model": "claude-sonnet-4-6",
-  "max_tokens": 1024,
-  "temperature": 0,
-  "system": SYSTEM_PROMPT,
-  "messages": [{ "role": "user", "content": [
-    { "type": "image", "source": { "type": "base64", "media_type": "image/jpeg", "data": imageBase64 } },
-    { "type": "text", "text": "Read this letter." }
-  ]}]
+  "systemInstruction": { "parts": [{ "text": SYSTEM_PROMPT }] },
+  "contents": [{ "role": "user", "parts": [
+    { "inline_data": { "mime_type": "image/jpeg", "data": imageBase64 } },
+    { "text": "Read this letter." }
+  ]}],
+  "generationConfig": {
+    "temperature": 0,
+    "maxOutputTokens": 4096,
+    "responseMimeType": "application/json"
+  }
 }
 ```
+
+**Vendor note.** This section originally specified the Claude API (`claude-sonnet-4-6`, `max_tokens` 1024). Changed to Gemini because the project has no Anthropic credit; a §13.1 that cannot be called is worse than one naming a different vendor. Everything §13.1 actually constrains is unchanged — the same `SYSTEM_PROMPT` verbatim, the same masked JPEG, temperature 0, the same seven-key contract and five `required_action` values, and the same "any failure → 502" so §11.1 step 4's fixture fallback still carries the demo. `maxOutputTokens` is 4096 rather than 1024 because Gemini draws reasoning tokens from the same budget as the reply, and `exact_text` is the whole letter verbatim.
 
 `SYSTEM_PROMPT` — copy verbatim:
 
 > You are Penny, a bank's accessibility assistant for blind customers. Look at this photographed letter and return ONLY a JSON object, no markdown fences, no prose, with exactly these keys: {"sender": string, "letter_type": string, "summary_spoken": string (max 40 words, warm, plain English, no jargon, written to be read aloud), "explain_spoken": string (max 80 words, plain-English explanation of what this letter means for the customer), "required_action": one of "none" | "order_card" | "confirm_address" | "form_fill" | "scam_alert", "sensitive_content": boolean (true if a PIN, password, or full card number is visible), "exact_text": string (the letter verbatim)}. If any card number or PIN is visible, replace it with [hidden] everywhere, including exact_text.
 
-Response handling: `data.content[0].text` → strip any ```json fences → `JSON.parse` → validate all seven keys exist and `required_action` is one of the five values (map `confirm_address`/`form_fill` to `none` client-side; only `order_card` and `scam_alert` have UI) → `res.json({ ok: true, letter })`. Any failure → `res.status(502).json({ ok: false })` (the client's fixture fallback handles it). Missing `ANTHROPIC_API_KEY` → immediate 502.
+Response handling: `data.candidates[0].content.parts[0].text` → strip any ```json fences → `JSON.parse` → validate all seven keys exist and `required_action` is one of the five values (map `confirm_address`/`form_fill` to `none` client-side; only `order_card` and `scam_alert` have UI) → `res.json({ ok: true, letter })`. Any failure → `res.status(502).json({ ok: false })` (the client's fixture fallback handles it). Missing `GEMINI_API_KEY` → immediate 502.
 
 ### 13.2 `api/tts.ts`
 
@@ -519,7 +522,7 @@ Algorithm:
 
 ## 18. Environment and deployment
 
-Server-side env vars (Vercel dashboard + local `.env`, never `VITE_`-prefixed): `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`. Local run: `npm i && npx vercel dev` (link the project when prompted). Voice assets: `ELEVENLABS_API_KEY=… npm run voice` once, commit the MP3s. Deploy: `vercel --prod`; test on the phone via the deployment URL (HTTPS is required for camera, vibration, and PWA install). Vibration works in Chrome for Android; on iOS Safari the blip fallback covers it.
+Server-side env vars (Vercel dashboard + local `.env`, never `VITE_`-prefixed): `GEMINI_API_KEY`, `ELEVENLABS_API_KEY`. Local run: `npm i && npx vercel dev` (link the project when prompted). Voice assets: `ELEVENLABS_API_KEY=… npm run voice` once, commit the MP3s. Deploy: `vercel --prod`; test on the phone via the deployment URL (HTTPS is required for camera, vibration, and PWA install). Vibration works in Chrome for Android; on iOS Safari the blip fallback covers it.
 
 ---
 
