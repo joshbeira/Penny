@@ -25,15 +25,25 @@ const API = "https://api.elevenlabs.io/v1";
 
 const force = process.argv.includes("--force");
 
-// SPEC 13.2's voice resolution, verbatim: "pick the voice named 'Alice'; if
-// absent, the first voice whose labels/description contain 'British'; else the
-// first voice."
+// SPEC 13.2 names the voice "Alice", but ElevenLabs now suffixes its premade
+// voices with a descriptor — the account lists "Alice - Clear, Engaging
+// Educator". So the name is compared with that suffix stripped.
+//
+// This is load-bearing, not cosmetic: on an exact match Alice is missed, and
+// SPEC 13.2's next branch picks the first British voice, which in this account
+// is "George - Warm, Captivating Storyteller" — male. Penny would silently
+// stop being the voice the spec names, in every recorded line and every runtime
+// line, across the whole film. api/tts.ts carries the identical rule.
+const voiceName = (voice) => (voice.name ?? "").split(" - ")[0].trim();
+
+// SPEC 13.2's voice resolution: "pick the voice named 'Alice'; if absent, the
+// first voice whose labels/description contain 'British'; else the first voice."
 //
 // The "British" test is case-insensitive. ElevenLabs ships label values
 // lowercased ({ accent: "british" }), so a case-sensitive match would make this
 // branch unreachable — which cannot be what SPEC 13.2 means by a fallback.
 function resolveVoice(voices) {
-  const alice = voices.find((voice) => voice.name === "Alice");
+  const alice = voices.find((voice) => voiceName(voice) === "Alice");
   if (alice) return alice;
 
   const british = voices.find((voice) =>

@@ -37,9 +37,17 @@ let voicePromise: Promise<string> | null = null;
 
 type Voice = { voice_id: string; name?: string; description?: string; labels?: unknown };
 
-// SPEC 13.2's resolution, verbatim: "pick the voice named 'Alice'; if absent,
-// the first voice whose labels/description contain 'British'; else the first
-// voice."
+// SPEC 13.2 names the voice "Alice", but ElevenLabs now suffixes its premade
+// voices with a descriptor — the account lists "Alice - Clear, Engaging
+// Educator". So the name is compared with that suffix stripped.
+//
+// On an exact match Alice is missed and SPEC 13.2's next branch picks the first
+// British voice, which in this account is "George - Warm, Captivating
+// Storyteller" — male. scripts/generate-voice.mjs carries the identical rule.
+const voiceName = (voice: Voice) => (voice.name ?? "").split(" - ")[0].trim();
+
+// SPEC 13.2's resolution: "pick the voice named 'Alice'; if absent, the first
+// voice whose labels/description contain 'British'; else the first voice."
 //
 // The "British" test is case-insensitive, matching scripts/generate-voice.mjs:
 // ElevenLabs ships label values lowercased ({ accent: "british" }), so a
@@ -47,7 +55,7 @@ type Voice = { voice_id: string; name?: string; description?: string; labels?: u
 // the recorded fixed lines and the runtime lines are the same voice or the
 // demo has two Pennys.
 function resolveVoice(voices: Voice[]): Voice {
-  const alice = voices.find((voice) => voice.name === "Alice");
+  const alice = voices.find((voice) => voiceName(voice) === "Alice");
   if (alice) return alice;
 
   const british = voices.find((voice) =>
