@@ -754,3 +754,202 @@ FIVE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P5):
   needs public/tesseract/* precached (P3's finding, unchanged).
 - P7's check.mjs still needs a deterministic answer to the aria-live race — see
   P5's finding above, which measures it rather than predicting it.
+
+P6 — complete except the MP3s (blocked on an API key permission, see below)
+
+Journey, Director and voice input per SPEC §17 P6: components/DirectorPanel.tsx
+(§12.1 + §12.2), screens/Journey.tsx with Home's era prop and three preset class
+sets in styles.css (§10), lib/voiceInput.ts + lib/intents.ts (§11.6), and the
+deletion of all seven temporary Settings controls. Also, at the user's
+direction and ahead of §17's own ordering: scripts/generate-voice.mjs (§14) and
+the two P5 findings, which amend §15 and §16.
+
+BLOCKED — the fifteen MP3s are not recorded:
+  scripts/generate-voice.mjs is written and works; public/audio/ is still empty.
+  The supplied ELEVENLABS_API_KEY is valid and carries text_to_speech (a probe
+  returned 200 audio/mpeg with an ID3 header) but NOT voices_read: GET
+  /v1/voices answers 401 "missing the permission voices_read". §13.2's voice
+  resolution is a GET /v1/voices, so "Alice" cannot be resolved and no line can
+  be recorded in the specified voice. Hard-coding a voice id was rejected — it
+  would desync the script from §13.2 and paper over the same failure at runtime,
+  since §13.2's /api/tts resolves the voice the same way on every cold start.
+  FIX: enable voices_read on the key, then `ELEVENLABS_API_KEY=… npm run voice`.
+  Until then every line takes §6.3 step 5's speechSynthesis fallback, which is
+  what P2–P5 verified against, so nothing else in the app is blocked.
+
+Decisions referred to the user (the spec states two things in each case):
+- Voice confirm reaches BOTH sheets and records method "voice". §11.6 says
+  "confirm the open sheet if any"; §11.2 hard-codes its receipt's method as
+  "double-tap". That hard-coding exists because a double-tap was the only way to
+  approve — §11.2's contents list gives that sheet no Confirm button — and
+  §9.1's own method union already carries "voice". Recording "double-tap" for a
+  spoken approval would put a false statement in a tamper-evident log (§1's
+  Action Receipts), and voice is the only route by which Tap & Tell can be
+  approved without sight or touch: the §15 gap P5 entered deliberately.
+- The mic is gated on speech-recognition support AND §10's "Voice input"
+  setting. §10 gates it on support alone and no section assigns the toggle
+  behaviour, but it is the control that names this feature; P1 had left it inert.
+- §11.3 is left as written. §15's amendment records that it supersedes the
+  role="status" there, so only the two sections the user named were touched.
+
+SPEC AMENDMENTS (§15 and §16, at the user's direction):
+- §15 gains the live-region queue contract — serial, one message at a time,
+  minimum 900ms gap, never overwritten, data-live-busy exposed while draining —
+  and the rule that the live region is the SOLE announcement channel, which is
+  what supersedes §11.3's role="status" on TextCard.
+- §16 step 2 now waits for data-live-busy="false" before snapshotting instead of
+  relying on networkidle, and states the one-tab requirement P3 recorded. This
+  is the deterministic answer P2, P3, P4 and P5 each said check.mjs needed.
+
+FINDING — the busy flag has to include audio in flight, not just the queue:
+  earcons.ts calls beginAudioActivity() at the START of an earcon and
+  endAudioActivity() only inside teardown(), which runs AFTER announce(line).
+  So a queue that is momentarily empty does not mean nothing more is coming. If
+  data-live-busy tracked the queue alone it would read "false" ~900ms after the
+  greet, while §7.1's Glance line lands at ~1043ms (P5's measurement) — P7 would
+  still be racing, which is the exact bug the flag exists to kill. getLiveBusy()
+  is therefore `draining || activity > 0`.
+
+FINDING — the mic sat underneath the sheets:
+  At z-20 the mic was covered by any open sheet (z-30). A tap is the only way to
+  start listening (§11.6), so §11.6's own "confirm"/"cancel" intents were
+  unreachable in practice and P5's accessibility gap stayed open. The mic is now
+  z-40. The dialogs keep aria-modal and their focus trap; this is a push-to-talk
+  button sitting over them, not a member of the dialog.
+
+DEFECT found by verification and fixed:
+  A range input's intrinsic box is ~16px tall, so §10's Journey slider was the
+  one control in the app under §4's 48×48 minimum. Now h-[48px].
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- Home's `era` prop is OPTIONAL and absent is what the router renders. §10 says
+  the presets "only apply inside Journey's preview" while also naming 2026 a
+  reduced preview; an optional prop is the only reading that satisfies both.
+- The era presets are token overrides on the preview wrapper, not restyled
+  elements: Tailwind v4 compiles .text-card to font-size: var(--text-card) and
+  .bg-surface to background-color: var(--surface), so redefining the variable
+  rescales or recolours the whole subtree. The multipliers stay as calc() so
+  §10's "font-scale 1.2" is legible in the source.
+- The preview frame uses `inert`, not aria-hidden: it drops the subtree from the
+  accessibility tree AND the tab order together, so hidden focusable children
+  cannot raise axe's aria-hidden-focus. 2030 is exempt — §10 calls its Glance
+  button the single interactive element in the preview.
+- The slider opens at position 1 (2026): both the HTML midpoint default for that
+  range and §10's own default era. Its accessible name is "Year" (§15 requires
+  labelled inputs; §10 names only the aria-valuetext).
+- The slider's three printed year labels are aria-hidden — aria-valuetext
+  already announces the year (§15 item 7), and reading all three on every swipe
+  would bury it.
+- DirectorPanel mounts inside the unlocked branch. §12.1 fixes the trigger's
+  position but not its lifetime, and a fixed 48×48 div over the Splash would
+  swallow §6.1's unlock tap.
+- /director renders Home behind the open panel; §12.1 fixes the route but not
+  what sits behind it.
+- The panel's radio rows are full-width 48px labels, so the row is the hit
+  target rather than the 20×20 input — P4 flagged the stand-in's bare radios as
+  the app's only sub-48px controls, and they go with it.
+- A push closes the panel: §11.2's sheet is the scenario, and the panel has done
+  its job once it fires.
+- The open-sheet registry is a module-level slot in ConfirmSheet.tsx beside
+  useDialogSheet(), not a fifth store — only one sheet can be open at a time
+  (both are modal), and §3's tree has no module for it. The precedent P4 set
+  with readReceiptsAloud and P5 with useDialogSheet.
+- The mic button's markup lives in App.tsx: §3's component list names no file
+  for it, and P4/P5 both kept helpers inside existing §3 files rather than
+  adding modules.
+- It is placed after <TabBar /> so DOM order matches §10's reading order
+  (Header · TabBar · floating mic).
+- "play my week" by voice plays from wherever the user is; §11.6 assigns
+  navigation to "receipt" and "post" only. Off Home the row flashes have nothing
+  to flash, which is why §7.2's onNote is optional.
+- The drained live region keeps its last message rendered. Clearing it is not
+  something §15 asks for, and data-live-busy is the contract §16 keys on.
+- No new unit tests. P4's node --test covers §9.2's pure logic; everything P6
+  adds is DOM and side-effects, verified in the browser instead.
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness; the
+speech, recogniser and WebAudio surfaces were wrapped from outside, so no debug
+hooks were added to the shipped code):
+- tsc --noEmit clean; npm run build ok; npm test 10/10
+- §14's script with no ELEVENLABS_API_KEY warns and exits 0
+- the live-region queue: §11.5's six-line read-aloud in Quiet Mode renders all
+  six in order at 900/900/900/900/900ms with none lost, data-live-busy "true"
+  throughout and "false" exactly 900ms after the last; the splash sequence lands
+  BOTH "Hi. I'm Penny." (129ms) and "Steady. One bill this week. One unusual
+  payment." (1236ms), where before the second overwrote whatever preceded it
+- no element but the live region carries a live role anywhere in the DOM
+- Journey: slider announces 2019/2026/2030 and opens on 2026; 2030 renders
+  exactly [Steady, Glance, Sound and touch only], health word 64px, a 96×96
+  button that really replays glance(), frame repainted #0A0D10; 2026 shows
+  balance + both buttons + the anomaly row + the Speech-first chip at 24.2px and
+  nothing else; 2019 the full UI at 26.4px on #22303C; the router's Home stays
+  22px and inherits no preset
+- Director: 3 taps inside 900ms open it, 3 spread over 1.5s do not; the trigger
+  is absent from the accessibility tree; all twelve control labels in §12.2's
+  order; focus trapped, Escape closes; Seed writes exactly §12.2's two receipts;
+  Reset empties; arming persists to penny.director.v1; a push raises §11.2's
+  sheet; /director opens the panel directly
+- Settings: exactly §10's four controls, ending at "Prototype v1.0" — zero
+  radios, zero push buttons, no "Director" legend
+- §11.6: mic 56×56, bottom-right above the TabBar, after nav in DOM order,
+  absent when Voice input is off, aria-pressed tracking listening both ways; all
+  six intents fire correctly; "cancel my post" reaches "post" first, which is
+  what first-hit-wins means; no-match speaks §11.6's line verbatim; voice "yes"
+  approves Tap & Tell writing one receipt with method "voice" and §11.2's
+  action/details unchanged; "no" cancels and writes none; "confirm" on §9.1's
+  ConfirmSheet through the real Post Box flow writes §11.1 step 8's payload with
+  method "voice"
+- §6.1's invariant survives P6's new imports: no audio API touched, no
+  speechSynthesis call and tone not even fetched (1 JS chunk) before the splash
+  tap; tone's chunk fetched and greet + the Glance both running after it
+- no regression on all five routes: #root order header · main · nav, landmarks
+  banner · main · navigation · status, exactly one h1, zero serious/critical axe
+  violations, every visible control ≥48×48, zero console errors
+- VITE_BREAK_LAYOUT=1 renders ["Play my week","Play the Glance"]; unset renders
+  the §10 order (both builds rendered, not grepped)
+
+§15 TALKBACK CHECKLIST — 10/10, run against the accessibility tree at 390×844:
+ 1. swipe order matches §10 on all five routes: banner → h1 → Quiet Mode →
+    screen content → navigation → the four tabs → mic
+ 2. the balance reads region "Current account balance" then "Current account" →
+    "£1,842.60" → "Steady" → "British Gas £84 due Wednesday"
+ 3. the mode switch carries aria-pressed; Summary pressed on arrival, and
+    selecting Explain moves it
+ 4. ConfirmSheet is named "Order replacement card", announces the read-back on
+    open, and confirms by double-tap (method "double-tap") AND by the Confirm
+    button (method "button") — one receipt each
+ 5. TextCards announced once: no card carries a live role, the singleton is the
+    only live element, and each line rendered exactly once over a 1.5s hold
+ 6. the anomaly row announces "Sat, TicketPoint Ltd, Other, -£68.20, unusual
+    payment"; it is the only one of the nine
+ 7. the slider is named "Year" and announces 2019 / 2026 / 2030 by aria-valuetext
+ 8. every visible control on all five routes plus the director panel and the Tap
+    & Tell sheet has an accessible name; axe agrees — zero serious/critical
+    across all seven surfaces
+ 9. receipts read as full sentences ("You have 3 receipts." / "Wednesday: Card
+    payment approved, confirmed by double-tap." …) and the #hash chip is on
+    screen but absent from the accessibility tree
+10. the mic keeps the name "Talk to Penny" and moves aria-pressed false → true →
+    false across a listening session, with the pulse ring behind
+    prefers-reduced-motion
+
+LIMIT ON THAT PASS — it is not a device pass. Items 1, 2, 4, 5 and 9 are claims
+about what TalkBack UTTERS, and headless Chromium has no screen reader; what was
+measured is the accessibility tree TalkBack reads from. The five must still be
+confirmed on the Android handset before filming, together with P2's and P5's
+outstanding device items (that speechSynthesis is audible and that
+navigator.vibrate produces §8's patterns).
+
+FOUR ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
+- The fifteen MP3s. Enable voices_read on the ElevenLabs key and run
+  `npm run voice`; the script and the commit are ready for them.
+- §13.2's real /api/tts is STILL unassigned to any phase in §17 (P2's finding,
+  unchanged through P3, P4 and P5). It needs the same voices_read permission.
+  Without it Penny never uses the ElevenLabs voice at runtime.
+- §14 pins includeAssets to ["audio/*.mp3", "icons/*"], which covers neither
+  .wasm.js nor .traineddata.gz; P7's "installed PWA passes scenario D offline"
+  needs public/tesseract/* precached (P3's finding, unchanged).
+- P7's check.mjs must wait on data-live-busy="false" (§16 as amended) and reuse
+  ONE tab across all five routes. The mic button will be in every baseline:
+  webkitSpeechRecognition IS defined in Playwright's Chromium, so turning
+  Voice input off after the baseline is written would fail lock:check.
