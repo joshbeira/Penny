@@ -57,14 +57,23 @@ function emitSpeaking(): void {
   speakingListeners.forEach((listener) => listener());
 }
 
+// Both also notify the live-region busy flag: audio in flight is a producer
+// that may still announce, so SPEC 15's `data-live-busy` cannot go false while
+// any is running. See the live region section below for why that matters.
 export function beginAudioActivity(): void {
   activity += 1;
-  if (activity === 1) emitSpeaking();
+  if (activity === 1) {
+    emitSpeaking();
+    emitLiveBusy();
+  }
 }
 
 export function endAudioActivity(): void {
   activity = Math.max(0, activity - 1);
-  if (activity === 0) emitSpeaking();
+  if (activity === 0) {
+    emitSpeaking();
+    emitLiveBusy();
+  }
 }
 
 export function isSpeaking(): boolean {
@@ -88,12 +97,75 @@ export function subscribeSpeaking(listener: () => void): () => void {
 // reader just because the text has not changed.
 export type Announcement = { text: string; seq: number };
 
+// SPEC 15: the live region is a SERIAL QUEUE, not a slot. announce() appends and
+// nothing is ever overwritten; messages render one at a time with a minimum gap
+// between them.
+//
+// Before this, the last writer won. P5 measured the failure: the splash Glance's
+// completion line landed 1043ms after the tap and silently replaced whatever a
+// flow had just posted, and a screen reader announced only the survivor. A burst
+// like SPEC 11.5's read-aloud (six lines at once, in Quiet Mode) lost five of
+// them the same way.
+const MIN_GAP_MS = 900;
+
 let announcement: Announcement = { text: "", seq: 0 };
 const announcementListeners = new Set<() => void>();
 
+let pending: string[] = [];
+let draining = false;
+
+// SPEC 15's `data-live-busy`. It is deliberately the union of two conditions,
+// not just the queue:
+//
+//   1. the queue is draining, and
+//   2. any audio is in flight (the sound-dot refcount above).
+//
+// Condition 2 is what makes the flag a usable wait for SPEC 16. earcons.ts posts
+// its completion line on a timer at the END of the earcon and only then tears
+// down, so audio activity is still up when that line is announced. Without it,
+// a consumer waiting for "false" would be released ~900ms after the greet — and
+// the Glance line would arrive after the snapshot, which is exactly the race
+// P2, P3, P4 and P5 each recorded and this flag exists to end.
+const liveBusyListeners = new Set<() => void>();
+
+function emitLiveBusy(): void {
+  liveBusyListeners.forEach((listener) => listener());
+}
+
+export function getLiveBusy(): boolean {
+  return draining || activity > 0;
+}
+
+export function subscribeLiveBusy(listener: () => void): () => void {
+  liveBusyListeners.add(listener);
+  return () => {
+    liveBusyListeners.delete(listener);
+  };
+}
+
 export function announce(text: string): void {
-  announcement = { text, seq: announcement.seq + 1 };
-  announcementListeners.forEach((listener) => listener());
+  pending.push(text);
+  if (!draining) void drain();
+}
+
+async function drain(): Promise<void> {
+  draining = true;
+  emitLiveBusy();
+
+  while (pending.length > 0) {
+    announcement = { text: pending.shift() as string, seq: announcement.seq + 1 };
+    announcementListeners.forEach((listener) => listener());
+
+    // The gap follows the LAST message too, so anything waiting on
+    // `data-live-busy="false"` is guaranteed the final line has been sitting in
+    // the region long enough to be picked up, not merely written to it.
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, MIN_GAP_MS);
+    });
+  }
+
+  draining = false;
+  emitLiveBusy();
 }
 
 export function getAnnouncement(): Announcement {

@@ -2,18 +2,19 @@ import { useEffect, useSyncExternalStore } from "react";
 import { dismissCard, getCards, subscribeCards } from "../lib/audio";
 import type { TextCardEntry } from "../lib/audio";
 
-// SPEC 11.3's TextCard: "--surface-raised, 22px text, role="status", stacks
-// above the TabBar, auto-dismiss 6s or on tap."
+// SPEC 11.3's TextCard: "--surface-raised, 22px text, stacks above the TabBar,
+// auto-dismiss 6s or on tap."
 //
 // This is the visible half of the argument SPEC 1 makes about Quiet Mode: the
 // speech is replaced, not deleted. Everything non-speech — the Glance, playWeek,
 // vibration, the haptic fallback blips — keeps playing, because none of it
 // comes through speak() (SPEC 11.3's matrix).
 //
-// SPEC 6.3 step 1 mirrors the same string into the live region in every mode, so
-// a screen reader hears it from LiveRegion.tsx whether or not this card's own
-// role="status" fires. That redundancy is SPEC 11.3 and SPEC 6.3 both taken
-// literally; SPEC 15's TalkBack pass is where it gets judged on the device.
+// NO role="status" HERE. SPEC 15 makes the live region the sole announcement
+// channel, superseding SPEC 11.3's attribute. SPEC 6.3 step 1 already mirrors
+// every string into LiveRegion.tsx in every mode, so a card that also announced
+// would say each Quiet Mode line to a screen reader twice — the failure
+// SPEC 15's TalkBack item 5 exists to catch. The card is a visual surface.
 
 const EMPTY: TextCardEntry[] = [];
 
@@ -26,13 +27,13 @@ function Card({ card }: { card: TextCardEntry }) {
     return () => window.clearTimeout(timer);
   }, [card.id]);
 
-  // A role="status" div rather than a button: SPEC 11.3 pins the role, and the
-  // two cannot both sit on one element. It stays out of the tab order in
-  // consequence — the 6s timer means nothing depends on dismissing it by hand,
-  // so no control goes unreachable (SPEC 15).
+  // A plain div, and deliberately not a button: the card announces nothing
+  // (SPEC 15 — the live region is the sole channel) and carries no information
+  // that is not already spoken or mirrored, so putting it in the tab order
+  // would add a control whose only function is to dismiss what a 6s timer
+  // dismisses anyway. Tap still works; nothing goes unreachable.
   return (
     <div
-      role="status"
       onPointerDown={() => dismissCard(card.id)}
       className="rounded-2xl bg-surface-raised p-4 text-card"
     >
