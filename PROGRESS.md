@@ -997,13 +997,79 @@ TWO ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
   webkitSpeechRecognition IS defined in Playwright's Chromium, so turning
   Voice input off after the baseline is written would fail lock:check.
 
+§13.1 MOVED FROM CLAUDE TO GOOGLE GEMINI (directed by the user)
+
+DEVIATION FROM SPEC, approved: §13.1 specified the Claude API. There is no
+Anthropic credit for this project and there is Gemini credit, and a §13.1 that
+cannot be called at all is worse than one naming a different vendor — without it
+§10's "Point at any letter — bank or not" has nothing behind it and every live
+read silently falls back to the card fixture. §13.1 and §18 are amended, with a
+vendor note in §13.1 recording what changed and why.
+
+Everything §13.1 actually constrains is unchanged: SYSTEM_PROMPT verbatim (now
+sent as systemInstruction, and re-verified byte-identical to SPEC.md's own copy
+at 767 chars, compared programmatically rather than by eye — P3's check re-run),
+the masked JPEG from §11.1 step 2 (now inline_data), temperature 0, the seven-key
+contract, the five required_action values, and "any failure → 502" so §11.1
+step 4's fixture fallback still carries all four filmed scenarios.
+
+Two changes beyond the plumbing:
+- maxOutputTokens 4096, not §13.1's 1024. Gemini draws reasoning tokens from the
+  same budget as the reply, so 1024 can be spent before a character of JSON is
+  emitted — and exact_text is the whole letter verbatim.
+- generationConfig.responseMimeType "application/json". The system prompt already
+  forbids fences; this makes it structural. The fence stripper stays as defence.
+
+FINDING — the model had to be chosen by measurement, not reputation:
+  §11.1 step 3 aborts at 8s, and that budget also covers a phone uploading a
+  ~1600px JPEG over mobile data, so latency binds before capability does. Against
+  this project's key, on the three §5.3 prop letters, temperature 0:
+    gemini-3.1-flash-lite  1.4-1.8s  card=order_card · scam=scam_alert ·
+                                     pin=none + sensitive_content true, PIN
+                                     masked to [hidden], the real 4821 never
+                                     appearing in exact_text or summary_spoken.
+                                     Three consecutive card runs: order_card each
+                                     time.
+    gemini-3.5-flash       5.7-6.3s  same verdicts, but under 2s inside the abort
+                                     before the upload is counted, and it
+                                     returned 403 on one of the three letters
+    gemini-2.5-flash/-lite           404, retired for new keys
+    gemini-2.5-pro                   429, quota exhausted
+    gemini-3.6-flash                 403, not permitted for this key
+  Pinned gemini-3.1-flash-lite. The first pin (gemini-2.5-flash, chosen from the
+  docs) was dead on arrival — testing against the real key is what caught it.
+
+Verified:
+- 24 checks with fetch stubbed: the request is exactly the amended §13.1 —
+  endpoint, x-goog-api-key header rather than a ?key= query param so the key
+  stays out of URLs and logs, content-type, systemInstruction, inline_data,
+  "Read this letter.", temperature 0, responseMimeType, maxOutputTokens; a valid
+  reply parses to the letter; fenced JSON is still stripped; and a non-200,
+  absent candidates, a blocked candidate, invalid JSON, a missing key, an unknown
+  required_action and a network throw each answer 502; all five required_action
+  values accepted
+- live through `vercel dev`: POST /api/read-letter → 200 in 2567ms with the
+  correct seven-key letter
+- §12.3 scenario A end to end on the LIVE path at 390×844, armed "Live API":
+  masking opened at +39ms and the POST left at +823ms, so masking demonstrably
+  ran BEFORE anything reached the network (the privacy claim, re-proved on the
+  path that actually transmits); result rendered at 3844ms, inside §11.1 step 3's
+  8s abort; the card reads "Debit card expiry notification", which is the live
+  model's wording and NOT the fixture's "Card expiry notice", so the live path is
+  what produced it; chip "5 items hidden on device"; the order_card action button
+  appeared; no read_fallback; and the bytes that left the device were 86,532
+  base64 chars against the source file's 106,032 — resized and masked, not raw
+- no regression on all five routes; tsc clean, build ok, 10/10 tests
+
+NOTE for deployment: `vercel dev` does not read plain .env — it uses .env.local
+and the linked project's environment. GEMINI_API_KEY had to be exported into the
+shell for the live run. Before filming from the deployment URL it must be added
+with `vercel env add GEMINI_API_KEY`, or §13.1 answers its specified 502 in
+production and every live read falls back to the fixture.
+
 STILL OUTSTANDING FOR THE HUMAN, before filming:
-- ANTHROPIC_API_KEY is set nowhere — not in .env, not in Vercel (checked; only
-  ELEVENLABS_API_KEY is there, across Production/Preview/Development). All four
-  §12.3 scenarios still work, because A, C and D are armed to fixtures and skip
-  the network entirely (§11.1 step 3), but §13.1's live path is what backs
-  §10's "Point at any letter — bank or not." Without the key that silently falls
-  back to the card fixture.
+- GEMINI_API_KEY must be added to Vercel (`vercel env add GEMINI_API_KEY`). It is
+  in local .env only; Vercel currently holds ELEVENLABS_API_KEY alone.
 - The device pass. §15 items 1, 2, 4, 5 and 9 are claims about what TalkBack
   UTTERS and can only be settled on the Android handset, together with P2's and
   P5's outstanding items (that speechSynthesis is audible — now only relevant

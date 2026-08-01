@@ -405,7 +405,7 @@ Armed letter radio group: **Live API / Card / NHS / Scam / PIN** (default Live) 
 `export const config = { api: { bodyParser: { sizeLimit: "6mb" } } };` Default-export `(req, res)`. Accept POST `{ imageBase64: string, mediaType: "image/jpeg" }`. Call the Google Gemini API (reference: https://ai.google.dev/gemini-api/docs):
 
 ```
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent
 headers: {
   "x-goog-api-key": process.env.GEMINI_API_KEY,
   "content-type": "application/json"
@@ -425,6 +425,8 @@ body: {
 ```
 
 **Vendor note.** This section originally specified the Claude API (`claude-sonnet-4-6`, `max_tokens` 1024). Changed to Gemini because the project has no Anthropic credit; a §13.1 that cannot be called is worse than one naming a different vendor. Everything §13.1 actually constrains is unchanged — the same `SYSTEM_PROMPT` verbatim, the same masked JPEG, temperature 0, the same seven-key contract and five `required_action` values, and the same "any failure → 502" so §11.1 step 4's fixture fallback still carries the demo. `maxOutputTokens` is 4096 rather than 1024 because Gemini draws reasoning tokens from the same budget as the reply, and `exact_text` is the whole letter verbatim.
+
+**Model choice is a latency decision.** §11.1 step 3 aborts the call at 8s, and that budget also covers a phone uploading a ~1600px JPEG over mobile data, so the model is pinned by measurement against this project's key, not by reputation. On the three §5.3 prop letters at temperature 0, `gemini-3.1-flash-lite` returned the right verdict on all three (`order_card`, `scam_alert`, and `none` + `sensitive_content: true` with the PIN masked to `[hidden]`) in 1.4–1.8s, repeatably. `gemini-3.5-flash` agreed but took 5.7–6.3s — inside the abort by under two seconds before the upload is counted — and returned 403 on one of the three. The 2.5 family is retired for new keys and `gemini-3.6-flash` is not permitted for this key. Re-measure before changing the pin.
 
 `SYSTEM_PROMPT` — copy verbatim:
 

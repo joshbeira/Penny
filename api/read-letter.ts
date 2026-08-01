@@ -47,9 +47,22 @@ const KEYS = [
   "exact_text",
 ];
 
-// SPEC 13.1's model. Flash rather than Pro: this is one image and a short JSON
-// reply on a stopwatch — SPEC 11.1 step 3 aborts the whole call at 8s.
-const MODEL = "gemini-2.5-flash";
+// SPEC 13.1's model, chosen by measurement against this project's key rather
+// than by reputation. SPEC 11.1 step 3 aborts the whole call at 8s, and that
+// budget also has to cover a phone uploading a ~1600px JPEG over mobile data,
+// so latency is the binding constraint, not capability.
+//
+// Measured on the three SPEC 5.3 prop letters, temperature 0:
+//   gemini-3.1-flash-lite  1.4-1.8s  card=order_card  scam=scam_alert
+//                                    pin=none/sensitive, PIN masked to [hidden]
+//   gemini-3.5-flash       5.7-6.3s  same verdicts, but only ~1.7s inside the
+//                                    abort before the upload is even counted,
+//                                    and it returned 403 on one of the three
+//   gemini-2.5-flash/-lite           retired for new keys (404)
+//   gemini-2.5-pro                   429, quota
+//   gemini-3.6-flash                 403, not permitted for this key
+// Three consecutive runs of flash-lite returned order_card every time.
+const MODEL = "gemini-3.1-flash-lite";
 
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
