@@ -33,9 +33,19 @@ function categoryLabel(category: Tx["category"]): string {
 const PILL =
   "flex min-h-[48px] items-center justify-center rounded-full border border-amber px-6 text-body text-amber";
 
+// SPEC 10's Journey: "Implement as an `era` prop on Home selecting one of three
+// preset class sets; default era "2026" behaves as the normal Home (no visual
+// difference at scale 1.0 — the presets only apply inside Journey's preview)."
+//
+// The prop is therefore OPTIONAL, and absent is what the router renders: the
+// full Home, unstyled by any preset. That is the only reading under which 2026
+// can both name a reduced preview (balance + buttons + anomaly row) and leave
+// the real screen untouched. Journey always passes an era explicitly.
+export type Era = "2019" | "2026" | "2030";
+
 // SPEC 10 order: balance region · the two pill buttons · the "This week" list.
 // That order is the Layout Lock baseline (SPEC 16) — never reorder.
-export default function Home() {
+export default function Home({ era }: { era?: Era }) {
   const bills = ACCOUNT.billsDueThisWeek
     .map((bill) => `${bill.payee} ${GBP_SHORT.format(bill.amount)} due ${bill.dueLabel}`)
     .join(" · ");
@@ -83,43 +93,84 @@ export default function Home() {
       ? [weekButton, glanceButton]
       : [glanceButton, weekButton];
 
+  const row = (tx: Tx) => {
+    const day = dayShortName(tx.date);
+    const category = categoryLabel(tx.category);
+    const amount = signedAmount(tx.amount);
+
+    return (
+      <li
+        key={tx.id}
+        aria-label={`${day}, ${tx.merchant}, ${category}, ${amount}${
+          tx.isAnomaly ? ", unusual payment" : ""
+        }`}
+        className={`flex items-center gap-2 border-b border-hairline py-3 ${
+          tx.isAnomaly ? "border-l-[3px] border-l-amber pl-2" : ""
+        }${flashing.has(tx.id) ? " row-flash" : ""}`}
+      >
+        <span className="shrink-0 text-caption text-text-dim">{day}</span>
+        <span className="min-w-0 flex-1 truncate">{tx.merchant}</span>
+        <span className="shrink-0 text-caption text-text-dim">{category}</span>
+        {tx.isAnomaly && <span className="shrink-0 text-caption text-amber">Unusual</span>}
+        <span className={`shrink-0 ${tx.amount > 0 ? "text-amber" : ""}`}>{amount}</span>
+      </li>
+    );
+  };
+
+  const balance = (
+    <section aria-label="Current account balance" className="rounded-2xl bg-surface p-4">
+      <p className="text-caption text-text-dim">{ACCOUNT.label}</p>
+      <p className="text-amount">{GBP.format(ACCOUNT.balance)}</p>
+      <p className="text-card text-amber">{HEALTH_WORD[accountHealth()]}</p>
+      <p className="text-caption text-text-dim">{bills}</p>
+    </section>
+  );
+
+  // SPEC 10's 2030 preview: "only the health word at 64px + one 96px round amber
+  // button labelled Glance (replays glance()) + caption 'Sound and touch only'".
+  // The button is the single interactive element in any preview, which is why
+  // Journey leaves this era alone rather than marking it inert.
+  if (era === "2030") {
+    return (
+      <div className="flex flex-col items-center gap-6 py-8">
+        <p className="text-health text-amber">{HEALTH_WORD[accountHealth()]}</p>
+        <button
+          type="button"
+          onClick={() => void glance()}
+          className="flex h-[96px] w-[96px] items-center justify-center rounded-full bg-amber text-body text-bg"
+        >
+          Glance
+        </button>
+        <p className="text-caption text-text-dim">Sound and touch only</p>
+      </div>
+    );
+  }
+
+  // SPEC 10's 2026 preview: "only balance region + the two buttons + the anomaly
+  // row; chip 'Speech-first'".
+  if (era === "2026") {
+    return (
+      <>
+        {balance}
+        <div className="mt-4 flex flex-col gap-3">{buttons}</div>
+        <ul className="mt-6">{WEEK.filter((tx) => tx.isAnomaly).map(row)}</ul>
+        <p className="mt-4 inline-block rounded-full border border-hairline px-3 py-1 text-caption text-text-dim">
+          Speech-first
+        </p>
+      </>
+    );
+  }
+
+  // No era (the router's Home) and SPEC 10's 2019 preview ("full UI") render the
+  // same tree; 2019 differs only by its preset class set on the wrapper.
   return (
     <>
-      <section aria-label="Current account balance" className="rounded-2xl bg-surface p-4">
-        <p className="text-caption text-text-dim">{ACCOUNT.label}</p>
-        <p className="text-amount">{GBP.format(ACCOUNT.balance)}</p>
-        <p className="text-card text-amber">{HEALTH_WORD[accountHealth()]}</p>
-        <p className="text-caption text-text-dim">{bills}</p>
-      </section>
+      {balance}
 
       <div className="mt-4 flex flex-col gap-3">{buttons}</div>
 
       <h2 className="mt-6 text-card">This week</h2>
-      <ul className="mt-2">
-        {WEEK.map((tx) => {
-          const day = dayShortName(tx.date);
-          const category = categoryLabel(tx.category);
-          const amount = signedAmount(tx.amount);
-
-          return (
-            <li
-              key={tx.id}
-              aria-label={`${day}, ${tx.merchant}, ${category}, ${amount}${
-                tx.isAnomaly ? ", unusual payment" : ""
-              }`}
-              className={`flex items-center gap-2 border-b border-hairline py-3 ${
-                tx.isAnomaly ? "border-l-[3px] border-l-amber pl-2" : ""
-              }${flashing.has(tx.id) ? " row-flash" : ""}`}
-            >
-              <span className="shrink-0 text-caption text-text-dim">{day}</span>
-              <span className="min-w-0 flex-1 truncate">{tx.merchant}</span>
-              <span className="shrink-0 text-caption text-text-dim">{category}</span>
-              {tx.isAnomaly && <span className="shrink-0 text-caption text-amber">Unusual</span>}
-              <span className={`shrink-0 ${tx.amount > 0 ? "text-amber" : ""}`}>{amount}</span>
-            </li>
-          );
-        })}
-      </ul>
+      <ul className="mt-2">{WEEK.map(row)}</ul>
     </>
   );
 }

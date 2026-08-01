@@ -67,6 +67,37 @@ body {
   color: var(--text);
 }
 
+/* SPEC 10's Journey era presets. Each is "one of three preset class sets"
+   applied to the framed preview only — the router's own Home never carries one,
+   which is what "no visual difference at scale 1.0" means.
+
+   They work by overriding the SPEC 4 tokens for that subtree rather than
+   restyling any element: Tailwind v4 compiles .text-card to
+   `font-size: var(--text-card)` and .bg-surface to
+   `background-color: var(--surface)`, so redefining the variable rescales or
+   recolours every descendant that uses the utility. The multipliers are written
+   as calc() so SPEC 10's "font-scale 1.2" stays legible in the source. */
+.era-2019 {
+  --surface: #22303c;
+  --text-caption: calc(16px * 1.2);
+  --text-body: calc(18px * 1.2);
+  --text-card: calc(22px * 1.2);
+  --text-screen: calc(28px * 1.2);
+  --text-amount: calc(40px * 1.2);
+}
+
+.era-2026 {
+  --text-caption: calc(16px * 1.1);
+  --text-body: calc(18px * 1.1);
+  --text-card: calc(22px * 1.1);
+  --text-screen: calc(28px * 1.1);
+  --text-amount: calc(40px * 1.1);
+}
+
+.era-2030 {
+  --bg: #0a0d10;
+}
+
 /* SPEC 4: visible focus ring on every focusable element. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 3px solid var(--amber);

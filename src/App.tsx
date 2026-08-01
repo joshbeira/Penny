@@ -1,4 +1,5 @@
 import { Route, Routes, useLocation } from "react-router-dom";
+import DirectorPanel from "./components/DirectorPanel";
 import Header from "./components/Header";
 import LiveRegion from "./components/LiveRegion";
 import Splash from "./components/Splash";
@@ -24,14 +25,17 @@ const TITLES: Record<string, string> = {
   "/journey": "One customer. Three years.",
 };
 
-// SPEC 3: router, Splash gate, LiveRegion. The DirectorPanel mount and its
-// /director route arrive in P6. Journey is routed but is not a tab (SPEC 10).
+// SPEC 3: router, Splash gate, LiveRegion, DirectorPanel mount. Journey is
+// routed but is not a tab (SPEC 10); /director is SPEC 12.1's backup route and
+// is excluded from both the TabBar and SPEC 16's route list.
 //
 // Body order is SPEC 10's canonical order: header · main · nav. SPEC 11.2's
 // payment sheet and SPEC 11.3's text cards are mounted after the TabBar because
 // both overlay the whole app rather than belonging to a screen — and both
 // render nothing at all unless a push is pending or speech has been suppressed,
-// so SPEC 16's route walk never sees them.
+// so SPEC 16's route walk never sees them. The director's trigger is
+// aria-hidden and its panel renders only once opened, so neither reaches the
+// Layout Lock baseline either.
 export default function App() {
   const unlocked = useSession((state) => state.unlocked);
   const pendingTap = useDirector((state) => state.pendingTap);
@@ -49,11 +53,15 @@ export default function App() {
               <Route path="/receipts" element={<Receipts />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/journey" element={<Journey />} />
+              {/* SPEC 12.1's backup route: the panel opens itself on arrival,
+                  and Home is what sits behind it. */}
+              <Route path="/director" element={<Home />} />
             </Routes>
           </main>
           <TabBar />
           {pendingTap && <TapTellSheet push={pendingTap} />}
           <TextCards />
+          <DirectorPanel />
         </>
       ) : (
         <Splash />
