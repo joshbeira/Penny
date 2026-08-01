@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { useDialogSheet } from "./ConfirmSheet";
+import { registerSheet, useDialogSheet } from "./ConfirmSheet";
+import type { ConfirmMethod } from "./ConfirmSheet";
 import { lineText } from "../data/voiceLines";
 import type { FixedLineId } from "../data/voiceLines";
 import { announce, speak } from "../lib/audio";
@@ -50,10 +51,14 @@ export default function TapTellSheet({ push }: { push: TapPush }) {
   // that in Quiet Mode the "Approved. Receipt saved." card — which is what
   // SPEC 12.3 scenario B films — is not raised behind the sheet that spawned it.
   //
-  // The method is hard-coded "double-tap" because SPEC 11.2 hard-codes it, and
-  // because a double-tap is the only way to approve: SPEC 11.2's contents list
-  // gives this sheet no Confirm button.
-  async function approve() {
+  // SPEC 11.2 hard-codes the receipt's method as "double-tap" because a
+  // double-tap was the only way to approve — its contents list gives this sheet
+  // no Confirm button. SPEC 11.6's voice intent adds a second way, so the method
+  // is now whatever was actually used. Recording "double-tap" for a spoken
+  // approval would put a false statement in a tamper-evident log (SPEC 1's
+  // Action Receipts), and voice is the only route by which this sheet can be
+  // approved without sight or touch — P5 recorded that gap deliberately.
+  async function approve(method: ConfirmMethod) {
     if (settled.current) return;
     settled.current = true;
 
@@ -64,7 +69,7 @@ export default function TapTellSheet({ push }: { push: TapPush }) {
     await useReceipts.getState().addReceipt({
       action: "Card payment approved",
       details,
-      method: "double-tap",
+      method,
     });
   }
 
@@ -79,6 +84,9 @@ export default function TapTellSheet({ push }: { push: TapPush }) {
   // SPEC 11.2: "same dialog rules as ConfirmSheet" — focus trapped, Escape
   // cancels, focus restored to the invoking button on close.
   const { sheet, onKeyDown } = useDialogSheet(cancel);
+
+  // SPEC 11.6: voice acts on "the open sheet if any", and this is one.
+  useEffect(() => registerSheet({ confirm: (method) => void approve(method), cancel }));
 
   useEffect(() => {
     // SPEC 11.2: "Director push → haptic("attention") → TapTellSheet". Fired
@@ -104,7 +112,7 @@ export default function TapTellSheet({ push }: { push: TapPush }) {
     const now = Date.now();
     if (now - lastTap.current < DOUBLE_TAP_MS) {
       lastTap.current = 0;
-      void approve();
+      void approve("double-tap");
       return;
     }
     lastTap.current = now;

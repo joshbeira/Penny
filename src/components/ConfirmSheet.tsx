@@ -64,6 +64,36 @@ export function useDialogSheet(onEscape: () => void) {
   return { sheet, onKeyDown };
 }
 
+// SPEC 11.6's "confirm"/"yes" and "cancel"/"no" intents act on "the open sheet
+// if any", so voice needs a handle on whichever sheet is up. A module-level slot
+// beside useDialogSheet() rather than a new store: SPEC 3's tree has no module
+// for it, only one sheet can be open at a time (both are modal), and this is the
+// precedent P4 set with readReceiptsAloud and P5 with useDialogSheet.
+type SheetHandlers = { confirm: (method: ConfirmMethod) => void; cancel: () => void };
+
+let openSheet: SheetHandlers | null = null;
+
+export function registerSheet(handlers: SheetHandlers): () => void {
+  openSheet = handlers;
+  return () => {
+    if (openSheet === handlers) openSheet = null;
+  };
+}
+
+// Both return whether a sheet was there, so intents.ts can tell "confirmed" from
+// "nothing to confirm" and fall through to SPEC 11.6's no-match line.
+export function confirmOpenSheet(): boolean {
+  if (!openSheet) return false;
+  openSheet.confirm("voice");
+  return true;
+}
+
+export function cancelOpenSheet(): boolean {
+  if (!openSheet) return false;
+  openSheet.cancel();
+  return true;
+}
+
 export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCancel }: Props) {
   const lastTap = useRef(0);
   // One decision per sheet. Without this a fast double-tap *on* the Confirm
@@ -86,6 +116,10 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
   };
 
   const { sheet, onKeyDown } = useDialogSheet(cancel);
+
+  // SPEC 11.6: voice confirms "the open sheet if any". SPEC 9.1's own method
+  // union already carries "voice", so this sheet was built for it.
+  useEffect(() => registerSheet({ confirm, cancel }));
 
   // SPEC 9.1: "On open, speak(readback)." Both id and text are passed by
   // SPEC 11.1 step 8 — audio.ts plays the recording and mirrors the text.

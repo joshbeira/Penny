@@ -145,4 +145,21 @@ body {
   .masking-bar {
     animation: penny-masking 1200ms ease-in-out infinite;
   }
+
+  /* SPEC 11.6's mic: "amber pulse ring while active". A ring drawn with
+     box-shadow rather than a scaled element, so the 56px tap target does not
+     move under the finger while it pulses. */
+  @keyframes penny-listening {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--amber);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgb(255 183 3 / 0.35);
+    }
+  }
+
+  .mic-listening {
+    animation: penny-listening 900ms ease-out infinite;
+  }
 }
