@@ -1067,9 +1067,55 @@ shell for the live run. Before filming from the deployment URL it must be added
 with `vercel env add GEMINI_API_KEY`, or §13.1 answers its specified 502 in
 production and every live read falls back to the fixture.
 
+DEPLOYMENT VERIFIED, and two blockers found on the way that only a real
+deployment could have exposed:
+
+FINDING — Vercel Authentication was on for the whole project:
+  Every request, production and preview alike, 302-redirected to Vercel SSO and
+  every /api call answered 401 "Protected deployment" (vercel_auth_enabled) before
+  the function ran. §18 has the phone loading the app from the deployment URL, so
+  an Android handset not signed into the Vercel account would have met a login
+  wall instead of Penny — taking the PWA install and §12.3 D's airplane-mode test
+  with it. The user disabled it.
+
+FINDING — every route except / returned 404 on the deployment:
+  /postbox, /receipts, /settings, /journey and /director all 404'd; only / and the
+  static assets resolved. A Vite SPA needs a rewrite to index.html and the
+  zero-config Vercel deployment had none. In-app TabBar navigation is client-side
+  so it worked, which is exactly what makes this easy to miss — but any refresh,
+  deep link or QR into a screen died, and §12.1's /director BACKUP ROUTE, the
+  safety net for reaching the panel mid-take, was dead on the deployment.
+  §16's Layout Lock would never have caught it: check.mjs runs against
+  `vite preview`, which has SPA fallback built in.
+  Fixed with a vercel.json carrying ONLY a rewrites array:
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  The negative lookahead keeps /api routed to the functions. This is the file §3's
+  tree does not list, added because the spec's own §12.1 route and §18's
+  phone-from-the-deployment-URL instruction cannot work without it. P0 avoided
+  vercel.json because a legacy `builds` array would disable zero-config and break
+  the dev command; `rewrites` does not, and `vercel dev` was re-checked after
+  adding it — still "Running Dev Command vite --port $PORT".
+
+Verified against the real HTTPS deployment (penny-o8avjkeib):
+- all six routes 200 and serve the app shell; /audio/greet.mp3, /tesseract/
+  worker.min.js and /icon.svg all 200 with correct content types
+- POST /api/read-letter → 200 in 2499ms, the correct seven-key letter: the
+  DEPLOYED function reached Gemini with the key stored in Vercel, which is what
+  proves the env var is actually wired
+- POST /api/tts → 200 audio/mpeg with an ID3 body: ElevenLabs works deployed too
+- §12.3 scenario A end to end from the deployment at 390×844, armed "Live API":
+  masking opened at +38ms and the POST left at +828ms — masking before the
+  network, on HTTPS, the way the phone will run it — result rendered at 3343ms,
+  "Debit card expiry notification" (live wording, not the fixture's), chip
+  "5 items hidden on device", order_card button, no read_fallback
+- the key stored in Vercel Production was pulled and compared: byte-identical to
+  local .env, and a direct call with it returns 200
+
 STILL OUTSTANDING FOR THE HUMAN, before filming:
-- GEMINI_API_KEY must be added to Vercel (`vercel env add GEMINI_API_KEY`). It is
-  in local .env only; Vercel currently holds ELEVENLABS_API_KEY alone.
+- PRODUCTION IS STALE. The only production deployment is 3 days old and predates
+  the Gemini switch, the fifteen MP3s, the SPA rewrite and all of P4–P6. Run
+  `vercel --prod` to publish current code; everything verified above was on a
+  preview deployment.
 - The device pass. §15 items 1, 2, 4, 5 and 9 are claims about what TalkBack
   UTTERS and can only be settled on the Android handset, together with P2's and
   P5's outstanding items (that speechSynthesis is audible — now only relevant
