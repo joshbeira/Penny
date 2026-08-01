@@ -940,12 +940,39 @@ confirmed on the Android handset before filming, together with P2's and P5's
 outstanding device items (that speechSynthesis is audible and that
 navigator.vibrate produces §8's patterns).
 
-FOUR ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
+§13.2's /api/tts, built here because no phase would ever claim it:
+  P0 built a 502 stub, P2 needed only that stub, and §14's voice script (P7)
+  covers the recorded fixed lines rather than the function. P2 recorded the gap
+  and P3, P4 and P5 each carried it forward unchanged. Without it every line
+  composed at runtime — §11.5's read-aloud, and Exact/Explain on every letter
+  (§11.1 step 6) — would stay on §6.3 step 5's speechSynthesis fallback forever,
+  so Penny would never use the ElevenLabs voice at runtime at all.
+  Built verbatim from §13.2, sharing generate-voice.mjs's voice resolution so
+  the recorded lines and the runtime lines are the same person — including the
+  case-insensitive "British" test, since ElevenLabs ships label values
+  lowercased and a case-sensitive match would make that branch unreachable.
+  Derived: a text over 600 chars is rejected with 400, not 502 — §13.2 says
+  "reject" without naming a code, this is the caller's error rather than the
+  upstream's, and §6.3 step 5 treats every non-200 identically. The cold-start
+  voice lookup is cached as the promise so concurrent first requests share one
+  lookup, and is NOT cached on failure, so a key whose permissions are fixed
+  mid-life starts working without a redeploy.
+  Verified by exercising the handler directly with fetch stubbed: non-POST,
+  missing text, >600 chars and a missing key all take their specified branch;
+  the request is byte-for-byte §13.2's (URL, output_format, both headers, and
+  {text, model_id, voice_settings}); "Alice" wins over a British voice and over
+  the first, and both fallbacks select correctly including a match in
+  `description`; the body is streamed back with content-type audio/mpeg; the
+  voice is resolved once per cold start, not per request; a 401 from /v1/voices,
+  a 500 from text-to-speech and an empty voice list each answer 502. Run live
+  against the real key it answers §13.2's 502 rather than crashing, which is the
+  path §6.3 step 5 is built for.
+
+THREE ITEMS FOR LATER PHASES (recorded, deliberately not acted on in P6):
 - The fifteen MP3s. Enable voices_read on the ElevenLabs key and run
-  `npm run voice`; the script and the commit are ready for them.
-- §13.2's real /api/tts is STILL unassigned to any phase in §17 (P2's finding,
-  unchanged through P3, P4 and P5). It needs the same voices_read permission.
-  Without it Penny never uses the ElevenLabs voice at runtime.
+  `npm run voice`; the script and the commit are ready for them. The SAME
+  permission is what /api/tts needs to serve a single line at runtime, so one
+  dashboard change unblocks both.
 - §14 pins includeAssets to ["audio/*.mp3", "icons/*"], which covers neither
   .wasm.js nor .traineddata.gz; P7's "installed PWA passes scenario D offline"
   needs public/tesseract/* precached (P3's finding, unchanged).
