@@ -104,6 +104,66 @@ body {
   outline-offset: 2px;
 }
 
+/* SPEC 11.6's mic: "amber pulse ring while active". SPEC 11.7 promoted this
+   button from one way in to THE way in, so it carries the whole listening state
+   — but it stays inside SPEC 4's one accent and its 56px tap target never moves
+   under the finger, which is why nothing here scales the button itself.
+
+   Three layers, all amber:
+     .mic-listening  the glow bed  — a soft ring, drawn with box-shadow
+     .mic-halo       a comet orbiting the rim, one turn every 2.4s
+     .mic-bar        four bars where the 10px glyph sits when idle
+
+   The static states below are deliberately OUTSIDE the reduced-motion block.
+   With motion reduced the mic would otherwise look identical listening and
+   idle, leaving aria-pressed as the only signal — fine for a screen reader,
+   nothing at all for a low-vision customer who has turned motion off. Frozen,
+   the halo reads as a fixed amber arc and the bars as a meter at rest. */
+.mic-listening {
+  box-shadow: 0 0 0 3px rgb(255 183 3 / 0.1);
+}
+
+.mic-halo {
+  position: absolute;
+  /* 56px disc + 15px a side = 86px, so closest-side is a 43px radius. */
+  inset: -15px;
+  border-radius: 999px;
+  pointer-events: none;
+  /* The comet: a long tail brightening to a full-strength head. Both ends of
+     the sweep are fully transparent, so the 0deg/360deg join leaves no seam. */
+  background: conic-gradient(
+    from 0deg,
+    rgb(255 183 3 / 0) 0deg,
+    rgb(255 183 3 / 0) 120deg,
+    rgb(255 183 3 / 0.28) 250deg,
+    rgb(255 183 3 / 1) 336deg,
+    rgb(255 183 3 / 0) 360deg
+  );
+  /* Punch the middle out so the comet is an annulus and never paints over the
+     disc or the bars. A ~4px stroke, feathered both sides, standing 3px clear
+     of the disc: 72% of 43px is 31px against the disc's own 28px radius. The
+     gap is the whole point — it is what makes the comet read as light rather
+     than as an edge. */
+  -webkit-mask: radial-gradient(
+    closest-side,
+    transparent 0 72%,
+    #000 82% 90%,
+    transparent 100%
+  );
+  mask: radial-gradient(closest-side, transparent 0 72%, #000 82% 90%, transparent 100%);
+}
+
+/* SPEC 4: on an amber fill, marks are #101418. The bars are the same shape the
+   product already uses for sound — SPEC 7.2 draws a week of spending as pitch
+   and pan, and this draws a voice as level. */
+.mic-bar {
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--bg);
+  transform: scaleY(0.4);
+}
+
 /* SPEC 4 / 15: all motion sits behind prefers-reduced-motion — the sound-dot
    pulse and the row flashes both. SoundDot.tsx applies .sound-dot--speaking
    while audio.ts reports playback; Home applies .row-flash for 400ms as
@@ -146,20 +206,81 @@ body {
     animation: penny-masking 1200ms ease-in-out infinite;
   }
 
-  /* SPEC 11.6's mic: "amber pulse ring while active". A ring drawn with
-     box-shadow rather than a scaled element, so the 56px tap target does not
-     move under the finger while it pulses. */
+  /* The glow bed breathes under the comet rather than snapping from nothing to
+     a hard ring: it is what reads as a glow instead of a spinning line. Drawn
+     with box-shadow, never a scale, so the tap target holds still. */
   @keyframes penny-listening {
     0%,
     100% {
-      box-shadow: 0 0 0 0 var(--amber);
+      box-shadow: 0 0 0 2px rgb(255 183 3 / 0.08);
     }
     50% {
-      box-shadow: 0 0 0 8px rgb(255 183 3 / 0.35);
+      box-shadow: 0 0 0 14px rgb(255 183 3 / 0.16);
     }
   }
 
   .mic-listening {
-    animation: penny-listening 900ms ease-out infinite;
+    animation: penny-listening 1600ms ease-in-out infinite;
+  }
+
+  @keyframes penny-halo-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* The comet dims and brightens on a different period from its rotation, so
+     the two never resolve into a countable beat. */
+  @keyframes penny-halo-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .mic-halo {
+    animation:
+      penny-halo-spin 2400ms linear infinite,
+      penny-halo-breathe 1600ms ease-in-out infinite;
+  }
+
+  @keyframes penny-meter {
+    0%,
+    100% {
+      transform: scaleY(0.35);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+
+  /* Four periods that share no common multiple worth hearing, and negative
+     delays so they start already out of phase — a synchronised first beat is
+     what makes a level meter look like a loading spinner. */
+  .mic-bar {
+    animation: penny-meter 600ms ease-in-out infinite;
+  }
+
+  .mic-bar:nth-child(1) {
+    animation-duration: 520ms;
+    animation-delay: -80ms;
+  }
+
+  .mic-bar:nth-child(2) {
+    animation-duration: 700ms;
+    animation-delay: -320ms;
+  }
+
+  .mic-bar:nth-child(3) {
+    animation-duration: 610ms;
+    animation-delay: -140ms;
+  }
+
+  .mic-bar:nth-child(4) {
+    animation-duration: 580ms;
+    animation-delay: -460ms;
   }
 }

@@ -1588,3 +1588,59 @@ FOUR ITEMS FOR THE HUMAN (P8 adds the first; the rest are P7's, unchanged):
   patterns).
 - Time the masking on the handset, per P7's measurement (5.0s and 7.0s against
   §11.1 step 2's 10s timeout).
+
+P8 addendum — the mic's listening animation (user-directed)
+
+SPEC 11.6 pins the mic's active state as an "amber pulse ring". P8 made this
+button the primary control rather than one way in, and the user asked for the
+listening state to read like Siri. Reshaped, not replaced: it is still an amber
+ring, still SPEC 4's single accent, and the 56px tap target still never moves.
+
+Three layers, all in styles.css, all amber:
+- .mic-listening — an ambient glow bed drawn with box-shadow, breathing 2px to
+  14px over 1600ms. box-shadow rather than a scale, so the target holds still
+  under the finger.
+- .mic-halo — a conic-gradient comet orbiting the rim once every 2.4s, masked to
+  a ~4px stroke standing 3px clear of the disc. Its opacity breathes on a
+  different period (1600ms) from its rotation, so the two never resolve into a
+  countable beat.
+- .mic-bar — the 10px glyph becomes four bars on periods 520/700/610/580ms with
+  negative delays, so they start already out of phase. #101418 on amber, per
+  SPEC 4. The shape is the product's own: SPEC 7.2 draws a week as pitch and
+  pan, this draws a voice as level.
+
+DEFECT found by verification and fixed:
+  The halo is absolutely positioned, so the button was given `relative` — which
+  cost it its fixed position outright. Tailwind emits .relative after .fixed, so
+  the later rule won and the mic fell out of the viewport corner into document
+  flow (measured at x=-18, y=946 on a 390x844 page). A fixed element is already
+  a containing block; the class was never needed. Removed.
+
+DESIGN NOTE — the first pass was a muddy bevel:
+  The glow bed started at 6px/0.28 and the comet's mask put its inner edge
+  exactly on the disc. With no gap the three layers merged into one thick brown
+  border — amber at 0.28 over #101418 is brown — and it read as a heavy edge
+  rather than as light. Fixed by dimming the bed to 0.10/0.16, thinning the
+  comet to a ~4px stroke, and opening a 3px dark gap between disc and comet. The
+  gap is what does the work.
+
+Reduced motion is not a degradation to nothing. The static ring, the frozen
+comet arc and the resting bars all sit OUTSIDE the prefers-reduced-motion block
+on purpose: before this, a customer with motion reduced saw no visual difference
+between listening and idle at all, and aria-pressed was the only signal — fine
+for a screen reader, nothing for a low-vision customer. Verified in both modes.
+
+Verified (390×844 Chromium, deviceScaleFactor 3, against `vite preview`):
+- tap target 56×56 idle AND listening, unchanged; the halo is pointer-events:
+  none, and a hit test 36px from centre — inside the halo, outside the disc —
+  lands on <main>, not the button, so the animation steals no taps
+- every element inside the button is within an aria-hidden subtree; the
+  accessible name stays "Talk to Penny" and aria-pressed still tracks listening
+- with prefers-reduced-motion: reduce, all three animation-names compute to
+  "none" while the static ring, arc and bars remain
+- npm run lock:check green — the baseline is untouched, because the listening
+  treatment renders only while listening and never reaches the accessibility
+  tree; SPEC 16 still reads `button "Talk to Penny"`
+- tsc --noEmit clean; npm test 14/14; and all four P8 harnesses re-run against
+  the animated button: 33/33 intents, 18/18 Post Box and order card, 19/19
+  barge-in and Quiet Mode, 31/31 no-regression, zero console errors

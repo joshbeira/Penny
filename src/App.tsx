@@ -129,10 +129,31 @@ function MicButton() {
         listening ? "mic-listening" : ""
       }`}
     >
-      {/* The glyph is decorative: aria-label above is the accessible name. */}
-      <span aria-hidden="true" className="text-card">
-        ●
-      </span>
+      {/* Everything inside the button is decorative — aria-label above is the
+          accessible name, and aria-pressed is the state. So the listening
+          treatment can be as elaborate as it likes without reaching the
+          accessibility tree: SPEC 16's baseline still reads
+          `button "Talk to Penny"` either way.
+
+          The halo overflows the button by 12px a side. It is pointer-events:
+          none, so the tap target is still exactly the 56px SPEC 4 asks for.
+          It needs no `relative` alongside `fixed` — a fixed element is already
+          a containing block, and adding one costs the button its fixed
+          position outright, since Tailwind emits .relative after .fixed. */}
+      {listening && <span aria-hidden="true" className="mic-halo" />}
+
+      {listening ? (
+        <span aria-hidden="true" className="flex items-center gap-[3px]">
+          <span className="mic-bar" />
+          <span className="mic-bar" />
+          <span className="mic-bar" />
+          <span className="mic-bar" />
+        </span>
+      ) : (
+        <span aria-hidden="true" className="text-card">
+          ●
+        </span>
+      )}
     </button>
   );
 }
