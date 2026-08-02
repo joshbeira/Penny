@@ -1,0 +1,23 @@
+- banner:
+  - heading "Post Box" [level=1]
+  - button "Quiet Mode"
+- main:
+  - text: Photograph a letter
+  - button "Photograph a letter"
+  - paragraph: Point at any letter — bank or not.
+- navigation:
+  - list:
+    - listitem:
+      - link "Home":
+        - /url: /
+    - listitem:
+      - link "Post Box":
+        - /url: /postbox
+    - listitem:
+      - link "Receipts":
+        - /url: /receipts
+    - listitem:
+      - link "Settings":
+        - /url: /settings
+- button "Talk to Penny"
+- status

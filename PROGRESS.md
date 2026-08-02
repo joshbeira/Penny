@@ -1121,3 +1121,212 @@ STILL OUTSTANDING FOR THE HUMAN, before filming:
   P5's outstanding items (that speechSynthesis is audible — now only relevant
   for runtime-composed lines — and that navigator.vibrate produces §8's three
   patterns).
+
+P7 — complete
+
+PWA, scripts and Layout Lock per SPEC §17 P7: scripts/make-icons.mjs (§14) with
+public/icons/penny-{192,512}.png committed, the vite-plugin-pwa block in
+vite.config.ts (§14), ci/layout-lock/check.mjs (§16) and the five committed
+baselines. §14's other script, generate-voice.mjs, and §13.2's /api/tts both
+landed in P6 ahead of §17's ordering, so P7 re-verifies them rather than building
+them: the voice script still warns and exits 0 with no key.
+
+SPEC AMENDMENT (§14, directed by the user and the only spec change in P7):
+  includeAssets gains "tesseract/**" and workbox gains
+  maximumFileSizeToCacheInBytes: 15 * 1024 * 1024. This is the item P3 recorded
+  and P4, P5 and P6 each carried forward unchanged. Without it §17 P7's own
+  acceptance criterion cannot be met and §12.3 D's claim has nothing behind it.
+  §14 carries a precache note recording what changed and why.
+
+FINDING — the two settings fail in OPPOSITE ways, which is why both are needed:
+  Read out of the installed plugin rather than assumed. vite-plugin-pwa resolves
+  includeAssets against publicDir and pushes each match into workbox's
+  additionalManifestEntries (index.js:97-126), and workbox applies
+  additionalManifestEntriesTransform LAST, after maximumSizeTransform
+  (lib/transform-manifest.js) — so includeAssets entries bypass the size filter
+  entirely. Therefore:
+  - eng.traineddata.gz (2.9 MB) matches NONE of Workbox's default globs
+    (js/css/html/ico/png/svg), so without "tesseract/**" it is SILENTLY absent.
+    No warning, no error: the app installs, looks right, and answers a
+    cold-start photograph with "Masking unavailable".
+  - the two tesseract-core-*.wasm.js (3.94 MB each) DO match "**/*.js", so at
+    the 2 MiB default they fail the build outright — vite-plugin-pwa resolves
+    throwMaximumFileSizeToCacheInBytes to !showMaximumFileSizeToCacheInBytesWarning,
+    i.e. true (index.js:910). Loud, not silent.
+  One setting fixes each. Neither substitutes for the other.
+
+FINDING — three files are precached TWICE, and it is safe only by coincidence:
+  With the limit raised, the three .js files under public/tesseract/ are matched
+  by BOTH the default glob and includeAssets, and nothing deduplicates them:
+  additionalManifestEntriesTransform pushes unconditionally. workbox-precaching
+  throws add-to-cache-list-conflicting-entries at install when one URL carries
+  two revisions — which would kill the service worker and take scenario D with
+  it. It does not fire here because both code paths hash MD5 over file content
+  (workbox-build/lib/get-string-hash.js and vite-plugin-pwa/dist/index.js:47),
+  emit the same relative URL, and no modifyURLPrefix is configured, so the
+  revisions are identical and the second entry is dropped. Asserted after every
+  build, not assumed: the manifest is parsed out of dist/sw.js and checked for
+  any URL appearing with two different revisions. If that ever diverges the fix
+  is globIgnores on the tesseract directory.
+  Manifest: 30 entries, 27 unique URLs, 12.07 MB.
+
+Decision referred to the user (§16 contradicts itself once P3's one-tab rule is
+applied):
+- §16 step 2 says "click body once (dismisses Splash)" for EVERY route, and also
+  that all five routes reuse one tab. With one tab the Splash exists only on "/".
+  On the other four the same click lands on the centre of <body> — Settings'
+  Quiet Mode toggle or its /journey link, Post Box's <label> wrapping the file
+  input, Home's two pill buttons — and would rewrite the very tree being
+  baselined. Agreed: issue §16's literal body click, guarded on the Splash
+  button being present. §16's own parenthetical fixes the click's purpose, and
+  where there is no Splash there is nothing to dismiss. P1 had already reshaped
+  the Splash out of `fixed` so that a body click lands on it; that fix is still
+  what makes the guarded click work.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- The --baseline refusal exits 1. §16 fixes the string and not the code; a
+  refusal is a failure. It is also checked BEFORE the build, so the one line
+  explaining the refusal is not buried under ten seconds of vite output.
+- Everything check.mjs prints goes to stdout, failures included. stdout is
+  block-buffered when piped and stderr is not, so splitting them would let a
+  BUILD FAILED line overtake the diff that explains it — and §16 says this
+  output is read off a terminal in front of an audience.
+- Axe runs in --baseline mode too (§16 step 3 is not scoped to check mode) and
+  prints violations as warnings without changing the exit code, which §16 step 4
+  fixes at 0. A migration that silently enshrined a serious violation would
+  defeat the gate.
+- A missing baseline prints its own line rather than a regression message: it is
+  not a structure change, it is an absent contract, and a diff against "" says
+  nothing useful.
+- The unified diff is hand-rolled (LCS backtrack, 3 lines of context). §19 bans
+  added dependencies and snapshots are ~40 lines, so the O(n·m) table is free.
+- check.mjs spawns `node node_modules/vite/bin/vite.js` rather than going through
+  npm: the preview server has to be killable, and an npm wrapper leaves the real
+  server orphaned on port 4173.
+
+FINDING — the busy flag has to be waited for in BOTH directions:
+  §16 as amended says wait for data-live-busy="false". On its own that is not
+  enough on the splash route: the flag is ALREADY "false" at the moment of the
+  tap, and §6.1 spends the tone dynamic-import, Tone.start() and the silent
+  buffer before speak() raises it. A "false"-only wait is therefore satisfied
+  instantly and snapshots an empty region. This is not theoretical — it happened
+  while building the /journey harness for the note below, and the symptom was
+  that the walk navigated away before setUnlocked reached sessionStorage, so
+  /journey rendered the Splash. check.mjs waits for "true" first on the splash
+  route (§6.3 step 1 announces BEFORE it plays, so the flag rises the instant
+  greet starts), then for "false". Three consecutive lock:check runs are green.
+
+FINDING — Playwright's ariaSnapshot does not model `inert`:
+  The /journey baseline contains the whole preview subtree — balance region,
+  both buttons, the anomaly row — even though P6 chose `inert` on the frame
+  specifically to drop it from the accessibility tree. Checked against Chrome's
+  OWN tree via CDP Accessibility.getFullAXTree rather than argued: Chrome's tree
+  for /journey contains RootWebArea, the h1, Quiet Mode, the slider, the four
+  tabs and the mic, and NO node named "Play the Glance", "Play my week" or
+  "Current account balance". Both preview buttons are also out of the tab order.
+  So P6's decision is correct and TalkBack does not read the preview; it is
+  Playwright's own computed tree that ignores `inert`.
+  Consequence, recorded for whoever migrates next: the Journey baseline is
+  BROADER than what a screen reader hears. That makes the lock stricter, not
+  wrong — changing the preview's structure trips the gate — but the file must
+  not be read as "what TalkBack utters".
+
+FINDING — Playwright cannot emulate airplane mode completely:
+  context.setOffline(true) blocks the network but leaves navigator.onLine TRUE,
+  in every configuration tried (newContext({offline}), persistent + setOffline
+  on the pre-existing page, on a fresh page, and launched with {offline:true} —
+  all four measured). P3 gates read_fallback on navigator.onLine, so the app
+  correctly stayed silent and the first offline run "failed" on the harness's
+  account, not the app's. A handset in airplane mode reports both. The flag is
+  stubbed to false from OUTSIDE via addInitScript, exactly as the speech, fetch
+  and WebAudio surfaces have been wrapped since P2 — no debug hooks in shipped
+  code — and the run additionally proves the network really is dead by watching
+  an uncached request get rejected.
+
+OBSERVATION — Post Box's photograph control appears twice in its baseline:
+  postbox.snap.yml carries both `text: Photograph a letter` and
+  `button "Photograph a letter"`. That is §10's own markup — a styled <label>
+  wrapping a sr-only file input — where the label contributes a text node and
+  the input contributes the named button. Axe is clean and P6's TalkBack pass
+  covered it; P7 changes nothing, because §10 IS the DOM contract and P7's job
+  is to enshrine it, not edit it. Recorded so the duplicate is not mistaken for
+  a Layout Lock artefact.
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness):
+- tsc --noEmit clean; npm run build ok (1058 modules); npm test 10/10
+- icons: 192×192 and 512×512 PNG; sampled pixel-for-pixel against §4's tokens —
+  background #101418, circle #FFB703, the "P" glyph exactly #101418 over 9810
+  pixels (so it rendered; a missing font would have left the circle bare), and
+  the rx=96 corners transparent
+- §14's voice script with no ELEVENLABS_API_KEY warns and exits 0 (P6's, re-run)
+- precache manifest parsed out of dist/sw.js: all four tesseract/* entries, all
+  fifteen audio/*.mp3, both icons, manifest.webmanifest and index.html present;
+  27 unique URLs; zero URLs carrying conflicting revisions
+- all four §16 strings compared PROGRAMMATICALLY against SPEC.md's own copies,
+  not retyped — including U+2014 in three of them and U+2713 in "Layout Lock ✓"
+- lock:baseline without LOCK_MIGRATION=1 prints §16's refusal verbatim, exits 1,
+  and leaves all five baseline files byte-identical (md5 before and after)
+- LOCK_MIGRATION=1 lock:baseline writes home 38 / postbox 23 / receipts 23 /
+  settings 32 / journey 31 lines, zero axe warnings, exit 0, ~30s end to end
+- every baseline read through against §10: header SoundDot(absent, aria-hidden) ·
+  h1 · Quiet Mode; Home's balance region then both buttons then the nine rows
+  with the anomaly suffix; Receipts in its EMPTY state (P4's note, confirmed);
+  Settings exactly §10's four controls ending at "Prototype v1.0" — no trace of
+  P3's temporary director stand-in; Journey's slider resting on 2026; the mic in
+  all five (P6's warning honoured — webkitSpeechRecognition IS defined in
+  Playwright's Chromium, so turning Voice input off would now fail lock:check);
+  and the live region carrying "Steady. One bill this week. One unusual payment."
+  on / and empty on the other four
+- lock:check green THREE consecutive times: "Layout Lock ✓ 5 routes verified,
+  0 violations", exit 0. One green run would have proved nothing about a race
+  four phases asked this gate to close
+- lock:demo-break exits 1 with a unified diff showing ["Play my week", "Play the
+  Glance"] against the baseline's ["Play the Glance", "Play my week"], then
+  §16's line for route / verbatim. It ALSO fails /journey, which is a true
+  positive rather than noise: Journey renders <Home era="2026"/>, so the
+  VITE_BREAK_LAYOUT swap really does regress two routes
+- the axe branch was PRODUCED, not asserted: an unlabelled button was added to
+  Settings, lock:check printed "BUILD FAILED — critical accessibility violation
+  on /settings: button-name (Buttons must have discernible text)" alongside the
+  regression line, both were byte-compared against §16's templates filled in
+  from SPEC.md, the button was reverted, and lock:check went green again
+- SCENARIO D OFFLINE FROM A COLD START (P7's acceptance criterion), Playwright
+  persistent profile so the service worker and its caches survive a restart:
+  warm run visits ONLY "/" and arms PIN through §12.1's /director, so tesseract
+  writes nothing to IndexedDB (asserted: zero databases) and the offline run is
+  a true first OCR served by the service worker rather than a warm cache. The
+  context is then CLOSED — that is the cold start — and reopened offline.
+  Results: the Splash loads from precache; a DEEP LINK straight to /postbox
+  resolves through Workbox's navigateFallback (so a refresh or QR into a screen
+  survives offline, which the deployment's own 404 bug in P6 shows is not free);
+  the chip reads "2 items hidden on device", NOT "Masking unavailable"; the live
+  region carries read_fallback at 820ms then pin_privacy at 6994ms, in that
+  order, with no second summary after it; both lines played from the precached
+  MP3s rather than speechSynthesis; the printed PIN (4821) never appears in the
+  live region; zero /api calls; and /tesseract/worker.min.js,
+  /tesseract/tesseract-core-simd-lstm.wasm.js and /tesseract/eng.traineddata.gz
+  were ALL served by the service worker at 200 — which is the one thing that had
+  to be measured rather than assumed, since tesseract spawns its worker from a
+  blob: URL and a blob worker only reaches the SW by inheriting its owner's
+  controller
+- the prop photographed offline is §5.3's pin exact_text with the printed 4821
+  substituted for [hidden], rendered at 1240×1754 — read out of letters.ts
+  rather than retyped
+
+MEASUREMENT WORTH WATCHING — masking took 5.0s and 7.0s across two offline runs
+of the same image, against §11.1 step 2's 10s timeout. There is less headroom
+than that number suggests, and this is a dev machine also running the preview
+server. If a phone crosses 10s during filming, scenario D degrades to the
+specified "Masking unavailable" chip — correct behaviour, but it removes the
+beat the shot exists for. Time it on the handset before filming beat 2.
+
+THREE ITEMS FOR THE HUMAN (P7 closes the build; these are not code):
+- PRODUCTION IS STILL STALE. Unchanged from P6, and now larger: production also
+  predates the PWA itself, so nothing installable exists at the production URL
+  yet. Run `vercel --prod`, then install from the phone and re-run scenario D on
+  the handset — the automated run above is the honest proxy for an installed
+  PWA, not the thing itself.
+- The device pass, unchanged from P6: §15 items 1, 2, 4, 5 and 9 are claims
+  about what TalkBack UTTERS, plus P2's and P5's items (speechSynthesis audible
+  for runtime-composed lines, navigator.vibrate producing §8's three patterns).
+- Time the masking on the handset, per the measurement above.

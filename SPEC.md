@@ -466,7 +466,9 @@ Stream the response back with `content-type: audio/mpeg`. Missing key or upstrea
 </svg>
 ```
 
-**PWA** — `vite-plugin-pwa`: `registerType: "autoUpdate"`; manifest `{ name: "Penny", short_name: "Penny", theme_color: "#101418", background_color: "#101418", display: "standalone", icons: [192, 512 from /icons] }`; `includeAssets: ["audio/*.mp3", "icons/*"]` so the fixed lines are precached and scenario D (airplane mode) keeps its voice.
+**PWA** — `vite-plugin-pwa`: `registerType: "autoUpdate"`; manifest `{ name: "Penny", short_name: "Penny", theme_color: "#101418", background_color: "#101418", display: "standalone", icons: [192, 512 from /icons] }`; `includeAssets: ["audio/*.mp3", "icons/*", "tesseract/**"]` so the fixed lines are precached and scenario D (airplane mode) keeps its voice; `workbox: { maximumFileSizeToCacheInBytes: 15 * 1024 * 1024 }`.
+
+**Precache note.** `includeAssets` originally read `["audio/*.mp3", "icons/*"]`, and the size limit was unstated. Both are amended because §17 P7's own criterion — "installed PWA passes scenario D offline" — is unreachable without them, and so is §12.3 D's claim that the PIN never leaves the phone. §11.1 step 2's masking runs on tesseract.js, whose three runtime assets P3 moved to `public/tesseract/` (the package otherwise fetches them from a CDN, which airplane mode does not have). Of those, `eng.traineddata.gz` matches **none** of Workbox's default globs, so without `tesseract/**` it is silently absent from the precache manifest: the app installs, looks correct, and answers a cold-start photograph with "Masking unavailable". The two 3.94 MB `tesseract-core-*.wasm.js` files *do* match the default `**/*.js` glob and exceed Workbox's 2 MiB default, which `vite-plugin-pwa` treats as a build error rather than a warning — 15 MB clears the largest file, and the whole precache is 12.07 MB across 27 entries. Nothing else changes: the manifest, `registerType`, and the two `includeAssets` entries already listed are as originally specified.
 
 ---
 

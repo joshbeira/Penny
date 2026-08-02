@@ -1,0 +1,38 @@
+- banner:
+  - heading "Home" [level=1]
+  - button "Quiet Mode"
+- main:
+  - region "Current account balance":
+    - paragraph: Current account
+    - paragraph: £1,842.60
+    - paragraph: Steady
+    - paragraph: British Gas £84 due Wednesday
+  - button "Play the Glance"
+  - button "Play my week"
+  - heading "This week" [level=2]
+  - list:
+    - listitem "Mon, Tesco, Groceries, -£42.30": Mon Tesco Groceries -£42.30
+    - listitem "Mon, ASOS refund, Income, +£12.00": Mon ASOS refund Income +£12.00
+    - listitem "Tue, WM Bus, Transport, -£4.20": Tue WM Bus Transport -£4.20
+    - listitem "Tue, Caffè Nero, Other, -£3.40": Tue Caffè Nero Other -£3.40
+    - listitem "Wed, British Gas, Bills, -£84.00": Wed British Gas Bills -£84.00
+    - listitem "Thu, Vets4Pets, Other, -£180.00": Thu Vets4Pets Other -£180.00
+    - listitem "Fri, Tesco, Groceries, -£28.75": Fri Tesco Groceries -£28.75
+    - listitem "Sat, TicketPoint Ltd, Other, -£68.20, unusual payment": Sat TicketPoint Ltd Other Unusual -£68.20
+    - listitem "Sun, From savings, Income, +£150.00": Sun From savings Income +£150.00
+- navigation:
+  - list:
+    - listitem:
+      - link "Home":
+        - /url: /
+    - listitem:
+      - link "Post Box":
+        - /url: /postbox
+    - listitem:
+      - link "Receipts":
+        - /url: /receipts
+    - listitem:
+      - link "Settings":
+        - /url: /settings
+- button "Talk to Penny"
+- status: Steady. One bill this week. One unusual payment.
