@@ -325,7 +325,7 @@ type Receipt = { id: string; ts: string; action: string; details: string;
 
 **Receipts `/receipts`** — order: **Read my receipts** button · **Verify chain** button · verify banner (hidden until run: "✓ Chain intact" amber / "✗ Broken at entry {n}" danger; on intact also `speak({id:"chain_ok"})`) · list newest-first: action (22px) · details · "Mon 6 Jul, 14:32" · method · `#a3f9…` (first 4 + last 4 of hash, dim). Empty state: "No receipts yet. Receipts are written every time Penny acts."
 
-**Settings `/settings`** — toggle list in order: Quiet Mode · Voice input · Demo mode. Then link **Sight-loss journey demo →** (`/journey`). Then "About Penny": the sentence "Nothing happens until Penny reads it back and you confirm. Every action leaves a receipt." + "Prototype v1.0".
+**Settings `/settings`** — toggle list in order: Quiet Mode · Voice input · Always listening · Demo mode. Then link **Sight-loss journey demo →** (`/journey`). Then "About Penny": the sentence "Nothing happens until Penny reads it back and you confirm. Every action leaves a receipt." + "Prototype v1.0".
 
 **Journey `/journey`** — `h1` "One customer. Three years." · slider (`input type="range"` min 0 max 2 step 1, `aria-valuetext` = "2019" | "2026" | "2030", labels under the track) · a non-interactive framed preview rendering `<Home era={…}/>`:
 - **2019**: font-scale 1.2, surface lightened to `#22303C`, full UI.
@@ -376,6 +376,55 @@ Compose and speak via runtime TTS: `"You have {n} receipts."` then for the lates
 ### 11.6 Voice input — `lib/voiceInput.ts` + `lib/intents.ts`
 
 `SpeechRecognition || webkitSpeechRecognition`, `lang "en-GB"`, `continuous false`, `interimResults false`. Mic button 56px, amber, `aria-label "Talk to Penny"`; tap toggles listening (amber pulse ring while active). Intent match on lowercase transcript, first hit wins: contains "receipt" → navigate `/receipts` + read receipts · "week" → `playWeek` · "glance" → `glance` · "post" → navigate `/postbox` · "confirm"/"yes" → confirm the open sheet if any · "cancel"/"no" → cancel it. No match → `speak({text:"I heard: {transcript}. Try: glance, play my week, or read my receipts."})`.
+
+### 11.7 Voice control surface
+
+Principle: every interactive control in §10 has at least one voice phrasing. The button is the sighted affordance; the voice command is the primary one.
+
+**Normalisation before matching:** lowercase, strip punctuation, expand contractions (what's → what is, don't → do not, I'm → I am), collapse whitespace.
+
+**Matching is deterministic and priority-ordered — first match wins, no model.** Each intent carries a phrase list of 8–12 natural variants (full sentences and synonyms, not bare keywords). All intents live in one data-driven `INTENTS` array in `lib/intents.ts` so phrasings can be extended without touching flow code. A phrase matches if the normalised transcript contains it as a substring or equals it.
+
+Priority order: (1) **sheet-scoped** when a dialog is open — these override everything; (2) **screen-scoped**; (3) **global**.
+
+| Scope | Intent id | Example phrasings (expand each to 8–12 natural variants) | Behaviour |
+|---|---|---|---|
+| Sheet | `confirm` | yes · confirm · go ahead · do it · approve · that is right · order it | Confirms the open sheet with `method: "voice"` |
+| Sheet | `cancel` | no · cancel · stop · never mind · do not · forget it | Cancels the sheet, plays `cancel_ok` |
+| Global | `glance` | balance · what is my balance · how much have I got · am I okay for money · how am I doing · check my account | Plays the Glance (§7.1) |
+| Global | `play_week` | play my week · what did I spend · my spending · what happened this week · play my transactions | Plays the week sweep (§7.2) |
+| Global | `day_query` | what did I spend on {day} · anything on {day} · what happened on {day} | Speaks that day's transactions from `WEEK` with merchant and amount; if none: "Nothing on {day}." Match any weekday name |
+| Global | `bills` | what bills are due · anything coming out · any bills this week · what do I owe | Speaks `billsDueThisWeek` from §5.1 |
+| Global | `order_card` | order my card · replace my card · I need a new card · order a replacement | Opens ConfirmSheet with the `readback_card` line → receipt on confirm |
+| Global | `read_receipts` | read my receipts · what have you done · my last actions · what did you do | §11.5 composition |
+| Global | `verify_chain` | verify · verify the chain · check my receipts · has anything changed | Runs `verifyChain()`, plays `chain_ok` if intact, speaks the broken index if not |
+| Global | `quiet_on` | quiet mode · whisper · I am in public · be discreet · quiet please | Sets quiet true, plays `quiet_on` |
+| Global | `quiet_off` | quiet mode off · speak up · out loud · you can talk · turn quiet mode off | Sets quiet false, speaks "Quiet Mode off. I'll speak." |
+| Global | `listening_off` | stop listening · turn off voice · stop the microphone | Disables voice input, announces the change |
+| Global | `repeat` | say that again · repeat · what was that · again please | Replays the last spoken string — store `lastSpoken` in `audio.ts` |
+| Global | `stop_speaking` | stop · shush · enough · be quiet | Halts current playback immediately (barge-in): stops the audio element, `speechSynthesis.cancel()`, and any Tone playback |
+| Global | `help` | help · what can you do · what can I say · my options | Speaks the contextual list for the current screen |
+| Nav | `go_home` | home · go home · main screen | Navigates to `/` and announces arrival |
+| Nav | `go_postbox` | post box · read a letter · I have a letter · scan a letter | Navigates to `/postbox` — see camera constraint below |
+| Nav | `go_receipts` | receipts · my receipts · show my receipts | Navigates to `/receipts` and announces arrival |
+| Nav | `go_settings` | settings · options · preferences | Navigates to `/settings` and announces arrival |
+| Nav | `go_journey` | journey · sight loss journey · the demo slider | Navigates to `/journey` and announces arrival |
+| Post Box | `mode_summary` | summarise · summary · short version | Switches reading mode and replays that text |
+| Post Box | `mode_exact` | word for word · read it exactly · exact · verbatim · the whole letter | Switches reading mode and replays |
+| Post Box | `mode_explain` | explain · what does that mean · in plain English · explain it to me | Switches reading mode and replays |
+| Journey | `era_2019` / `era_2026` / `era_2030` | twenty nineteen · two thousand and nineteen · twenty thirty | Sets the slider to that era |
+
+**Confirmation policy.** Anything with an account consequence (`order_card`, and any future action) still passes through ConfirmSheet and the Read-Back Rule — voice never bypasses confirmation. Non-consequential state changes (navigation, reading modes, Quiet Mode, listening toggle, era) execute immediately and Penny announces the resulting state afterwards.
+
+**Unmatched input.** Never say "try saying". Speak a warm contextual offer naming what is available on the current screen. On Home: "I can check your balance, play your week, read a letter, or read your receipts. Which one?" Compose per screen from that screen's available intents.
+
+**Browser constraint — the camera.** A speech-recognition result is not a user-activation gesture, so a voice command cannot open the file picker. Therefore `go_postbox` navigates and Penny says "Post Box is open. Tap anywhere to photograph a letter." In the Post Box *idle* state the entire main region becomes the `<label>` for the file input (min-height 60vh), with the 56px button retained visually inside it. Nothing on that screen is a small target the customer has to locate.
+
+**Always listening — new Settings toggle, default OFF.** When on, recognition auto-restarts on `onend` so no button press is needed. Default off so filming and demos stay deterministic. Add it to the §10 Settings list after "Voice input".
+
+**Quiet Mode interaction.** All voice responses obey the §11.3 matrix unchanged: in Quiet Mode they render as TextCards, and every response still mirrors to the live region.
+
+**Scope note.** §19 bans additional settings. The "Always listening" toggle is the one exception this section creates, because the auto-restart behaviour has no other home in §10 and §11.7's own principle requires the feature to be controllable. Nothing else in §19 is relaxed: no new dependencies, screens or routes.
 
 ---
 
@@ -521,6 +570,8 @@ Algorithm:
 **P6 — Journey, Director, voice input.** Era presets, slider, panel with all §12.2 controls, intents. ✅ 2030 era shows only the health word + Glance button; "play my week" by voice works in Chrome Android.
 
 **P7 — PWA, scripts, Layout Lock.** Manifest + precache, icons script, voice script (skips gracefully without a key), CI gate with baselines committed. ✅ `npm run lock:check` green; `npm run lock:demo-break` red with the exact §16 message; installed PWA passes scenario D offline.
+
+**P8 — Voice control surface.** Implement §11.7. ✅ Every control in §10 is reachable by voice; `order_card` by voice still passes through ConfirmSheet and writes a receipt with method "voice"; unmatched input speaks the contextual offer and never says "try saying"; matcher unit tests pass; `npm run lock:check` passes against a migrated baseline.
 
 ---
 
