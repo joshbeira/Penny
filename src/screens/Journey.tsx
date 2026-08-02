@@ -9,6 +9,24 @@ import type { Era } from "./Home";
 
 const ERAS: Era[] = ["2019", "2026", "2030"];
 
+// SPEC 11.7's `era_2019` / `era_2026` / `era_2030`: "Sets the slider to that
+// era." A module-level registry rather than a fifth store — the precedent P6 set
+// with registerSheet() in ConfirmSheet.tsx, for the same reason: SPEC 3's tree
+// has no module for it, only one Journey can be mounted, and voice needs a
+// handle on a screen it is not rendering.
+//
+// Returns false when Journey is not on screen, so lib/voiceInput.ts can offer
+// what IS available instead of silently moving a slider nobody can see. (The
+// matcher makes that unreachable — these intents are scoped to /journey — but
+// the screen, not the phrase table, is the thing that actually knows.)
+let setEra: ((era: Era) => void) | null = null;
+
+export function setJourneyEra(era: Era): boolean {
+  if (!setEra) return false;
+  setEra(era);
+  return true;
+}
+
 export default function Journey() {
   // SPEC 10 fixes min 0 / max 2 / step 1 but not the resting position. 1 is both
   // the HTML midpoint default for that range and SPEC 10's own default era, so
@@ -29,6 +47,13 @@ export default function Journey() {
   useEffect(() => {
     if (frame.current) frame.current.inert = era !== "2030";
   }, [era]);
+
+  useEffect(() => {
+    setEra = (next) => setIndex(ERAS.indexOf(next));
+    return () => {
+      setEra = null;
+    };
+  }, []);
 
   return (
     <>

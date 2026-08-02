@@ -45,11 +45,21 @@ function Toggle({
 // /director. This screen is once again exactly SPEC 10's list, which is what
 // P7's Layout Lock baseline must enshrine.
 
-// SPEC 10 order: Quiet Mode · Voice input · Demo mode · Journey link · About
-// Penny. That order is the Layout Lock baseline (SPEC 16) — never reorder.
+// SPEC 10 order, as amended by SPEC 11.7: Quiet Mode · Voice input · Always
+// listening · Demo mode · Journey link · About Penny. That order is the Layout
+// Lock baseline (SPEC 16) — never reorder. The fourth toggle is the one addition
+// SPEC 19 gives way to, and it is why P8 migrates the baseline deliberately.
 export default function Settings() {
-  const { quietMode, voiceInput, demoMode, setQuietMode, setVoiceInput, setDemoMode } =
-    useSettings();
+  const {
+    quietMode,
+    voiceInput,
+    alwaysListening,
+    demoMode,
+    setQuietMode,
+    setVoiceInput,
+    setAlwaysListening,
+    setDemoMode,
+  } = useSettings();
 
   return (
     <>
@@ -66,6 +76,14 @@ export default function Settings() {
           }}
         />
         <Toggle label="Voice input" checked={voiceInput} onChange={setVoiceInput} />
+        {/* SPEC 11.7: "When on, recognition auto-restarts on `onend` so no
+            button press is needed." Default off — a demo that starts listening
+            by itself is not a deterministic take. */}
+        <Toggle
+          label="Always listening"
+          checked={alwaysListening}
+          onChange={setAlwaysListening}
+        />
         <Toggle label="Demo mode" checked={demoMode} onChange={setDemoMode} />
       </ul>
 

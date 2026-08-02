@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { announce, speak } from "../lib/audio";
+import { speak } from "../lib/audio";
 import { useReceipts } from "../state/receipts";
 import type { ChainResult } from "../state/receipts";
 
@@ -52,6 +52,27 @@ export async function readReceiptsAloud(): Promise<void> {
   }
 }
 
+// SPEC 11.7's `verify_chain`: "Runs verifyChain(), plays chain_ok if intact,
+// speaks the broken index if not."
+//
+// AMENDS P4. P4 posted the broken case straight to aria-live and spoke nothing,
+// reading SPEC 10 as giving a spoken line to the intact case only. SPEC 11.7
+// says the broken index is SPOKEN, and P8's constraint is that a voice intent
+// calls the same function the button calls — so one of the two had to move, and
+// the user chose this one. Both paths now speak it. In Quiet Mode it becomes a
+// TextCard like every other line (SPEC 11.3), and speak() still mirrors it to
+// the live region, so nothing P4 gained is lost.
+//
+// Returns the result so the screen can render SPEC 10's banner from it.
+export async function verifyChainAloud(): Promise<ChainResult> {
+  const result = await useReceipts.getState().verifyChain();
+
+  if (result.ok) void speak({ id: "chain_ok" });
+  else void speak({ text: `Broken at entry ${result.brokenAt}.` });
+
+  return result;
+}
+
 // SPEC 10 order: Read my receipts · Verify chain · verify banner · the list.
 export default function Receipts() {
   const receipts = useReceipts((state) => state.receipts);
@@ -61,20 +82,7 @@ export default function Receipts() {
   const [chain, setChain] = useState<ChainResult | null>(null);
 
   async function verify() {
-    const result = await useReceipts.getState().verifyChain();
-    setChain(result);
-
-    if (result.ok) {
-      // SPEC 10 gives speech to the intact case only; speak() mirrors itself
-      // into the live region.
-      void speak({ id: "chain_ok" });
-    } else {
-      // The broken case would otherwise be silent to a screen reader. Posted
-      // straight to aria-live rather than through speak(), exactly as SPEC
-      // 7.1/7.2's completion lines are — routing it through speak() would
-      // speak a line SPEC 10 does not give one to.
-      announce(`Broken at entry ${result.brokenAt}`);
-    }
+    setChain(await verifyChainAloud());
   }
 
   return (

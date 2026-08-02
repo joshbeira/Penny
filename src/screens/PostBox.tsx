@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import ConfirmSheet from "../components/ConfirmSheet";
-import type { ConfirmMethod } from "../components/ConfirmSheet";
+import { requestOrderCard } from "../components/ConfirmSheet";
 import { SCENARIOS } from "../data/letters";
 import type { Letter } from "../data/letters";
 import type { FixedLineId } from "../data/voiceLines";
@@ -48,6 +47,24 @@ const MODES: { value: Mode; label: string }[] = [
   { value: "explain", label: "Explain" },
 ];
 
+// SPEC 11.7's `mode_summary` / `mode_exact` / `mode_explain`: "Switches reading
+// mode and replays that text." A module-level registry, like Journey's era and
+// P6's sheet registry — voice needs a handle on a screen it is not rendering,
+// and SPEC 3's tree has no module for one.
+//
+// It registers pick(), not setMode(), so voice takes the identical path SPEC
+// 10's segmented control takes: switch AND replay, one implementation.
+// Registration is gated on there being a letter on screen, so false means
+// "nothing to read yet" and lib/voiceInput.ts offers instead of switching an
+// invisible control.
+let pickMode: ((mode: Mode) => void) | null = null;
+
+export function setPostBoxMode(mode: Mode): boolean {
+  if (!pickMode) return false;
+  pickMode(mode);
+  return true;
+}
+
 type Result = {
   letter: Reading;
   summaryId: FixedLineId | null;
@@ -59,7 +76,6 @@ export default function PostBox() {
   const [status, setStatus] = useState<"idle" | "masking" | "result">("idle");
   const [result, setResult] = useState<Result | null>(null);
   const [mode, setMode] = useState<Mode>("summary");
-  const [confirming, setConfirming] = useState(false);
   const preview = useRef<string | null>(null);
 
   // SPEC 11.1 step 2: "a tesseract.js `eng` worker is created when Post Box
@@ -213,16 +229,16 @@ export default function PostBox() {
     else void speak(summaryId ? { id: summaryId } : { text: letter.summary_spoken });
   }
 
-  // SPEC 11.1 step 8's exact payload.
-  async function onConfirm(method: ConfirmMethod) {
-    setConfirming(false);
-    await useReceipts.getState().addReceipt({
-      action: "Replacement card ordered",
-      details: "Arriving in 5 working days to home address",
-      method,
-    });
-    void speak({ id: "done_receipt" });
-  }
+  // SPEC 11.7 makes `mode_*` reach the same pick() the segmented control calls.
+  // Registered only while a result is on screen: with no letter there is nothing
+  // to switch, and voiceInput.ts turns that into the contextual offer.
+  useEffect(() => {
+    if (!result) return undefined;
+    pickMode = pick;
+    return () => {
+      pickMode = null;
+    };
+  });
 
   // SPEC 11.4's danger treatment. SPEC 4 reserves --danger for scam and tamper
   // and nothing else.
@@ -231,13 +247,53 @@ export default function PostBox() {
   return (
     <>
       {/* SPEC 10: a styled <label> wrapping an sr-only file input, so the
-          control has a real accessible name (SPEC 15). */}
-      <label className="flex min-h-[56px] w-full cursor-pointer items-center justify-center rounded-full bg-amber px-6 text-body text-bg">
-        Photograph a letter
+          control has a real accessible name (SPEC 15).
+
+          SPEC 11.7's camera constraint reshapes it in the IDLE state only: "the
+          entire main region becomes the <label> for the file input
+          (min-height 60vh), with the 56px button retained visually inside it.
+          Nothing on that screen is a small target the customer has to locate."
+          The reason is a browser rule, not a preference — a speech-recognition
+          result is not a user-activation gesture, so `go_postbox` can only
+          navigate and say "Tap anywhere to photograph a letter". That sentence
+          has to be true of the whole screen.
+
+          Three consequences, all deliberate:
+          - the 56px pill is now a <span>, not a <button>. A real button nested
+            in a label is invalid and would swallow the label's own click.
+          - the idle hint is a <span class="block">, not a <p>. A label's content
+            model is phrasing content; a <p> inside one is invalid HTML.
+          - the input carries an explicit aria-label. Without it the accessible
+            name would absorb the hint text and become "Photograph a letter Point
+            at any letter — bank or not", which is not SPEC 10's name.
+
+          Masking and result states keep the plain 56px pill. SPEC 10's element
+          order is unchanged throughout — only the nesting moves, which is one of
+          the two changes P8 migrates the Layout Lock baseline for. */}
+      <label
+        className={
+          status === "idle"
+            ? "flex min-h-[60vh] w-full cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border border-hairline"
+            : "flex min-h-[56px] w-full cursor-pointer items-center justify-center rounded-full bg-amber px-6 text-body text-bg"
+        }
+      >
+        {status === "idle" ? (
+          <>
+            <span className="flex min-h-[56px] items-center justify-center rounded-full bg-amber px-6 text-body text-bg">
+              Photograph a letter
+            </span>
+            <span className="block text-caption text-text-dim">
+              Point at any letter — bank or not.
+            </span>
+          </>
+        ) : (
+          "Photograph a letter"
+        )}
         <input
           type="file"
           accept="image/*"
           capture="environment"
+          aria-label="Photograph a letter"
           className="sr-only"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -247,10 +303,6 @@ export default function PostBox() {
           }}
         />
       </label>
-
-      {status === "idle" && (
-        <p className="mt-4 text-caption text-text-dim">Point at any letter — bank or not.</p>
-      )}
 
       {status === "masking" && (
         <div className="mt-4">
@@ -302,11 +354,14 @@ export default function PostBox() {
             ))}
           </div>
 
-          {/* SPEC 10: the action row exists only for order_card. */}
+          {/* SPEC 10: the action row exists only for order_card. The flow it
+              raises moved to components/ConfirmSheet.tsx in P8, because SPEC
+              11.7 also reaches it globally by voice — this button and
+              "order my card" now call the identical function. */}
           {result.letter.required_action === "order_card" && (
             <button
               type="button"
-              onClick={() => setConfirming(true)}
+              onClick={requestOrderCard}
               className="mt-4 flex min-h-[56px] w-full items-center justify-center rounded-full bg-amber px-6 text-body text-bg"
             >
               Order replacement card
@@ -318,22 +373,6 @@ export default function PostBox() {
               speak — scam_filed already said "I've filed it for you". */}
           {scam && <p className="mt-4 text-caption text-text-dim">Receipt saved</p>}
         </section>
-      )}
-
-      {confirming && (
-        <ConfirmSheet
-          // SPEC 11.1 step 8, verbatim. `text` spells the number and `id` names
-          // the recording of it, so the live region reads "42 Lavender Grove"
-          // while the audio says "forty two".
-          readback={{
-            id: "readback_card",
-            text: "Ordering a replacement debit card to your home address at 42 Lavender Grove. It will arrive in five working days. Double-tap to confirm.",
-          }}
-          // SPEC 4: one name for the action the whole way through.
-          actionLabel="Order replacement card"
-          onConfirm={(method) => void onConfirm(method)}
-          onCancel={() => setConfirming(false)}
-        />
       )}
     </>
   );

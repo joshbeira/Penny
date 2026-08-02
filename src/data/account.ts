@@ -21,6 +21,24 @@ export function accountHealth(account = ACCOUNT): Health {
   return "tight";
 }
 
+// SPEC 10 renders the bill as "British Gas £84 due Wednesday", and SPEC 11.7's
+// `bills` intent speaks the same fixture. One composition, for the same reason
+// accountHealth() is here rather than in earcons.ts: Home and the voice surface
+// must not be able to disagree about what is due. The trailing .00 is dropped
+// because SPEC 10's own rendering does.
+const GBP_SHORT = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
+export function billPhrases(account = ACCOUNT): string[] {
+  return account.billsDueThisWeek.map(
+    (bill) => `${bill.payee} ${GBP_SHORT.format(bill.amount)} due ${bill.dueLabel}`,
+  );
+}
+
 export const HEALTH_WORD: Record<Health, string> = {
   steady: "Steady",
   tight: "Tight",

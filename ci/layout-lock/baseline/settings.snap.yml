@@ -8,6 +8,8 @@
     - listitem:
       - button "Voice input" [pressed]
     - listitem:
+      - button "Always listening"
+    - listitem:
       - button "Demo mode"
   - link "Sight-loss journey demo":
     - /url: /journey

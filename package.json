@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
-    "test": "node --test src/lib/hash.test.ts src/state/receipts.test.ts",
+    "test": "node --test src/lib/hash.test.ts src/lib/intents.test.ts src/state/receipts.test.ts",
     "voice": "node scripts/generate-voice.mjs",
     "icons": "node scripts/make-icons.mjs",
     "lock:check": "node ci/layout-lock/check.mjs",

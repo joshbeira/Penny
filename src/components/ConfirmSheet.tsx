@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FixedLineId } from "../data/voiceLines";
 import { speak } from "../lib/audio";
 import { haptic } from "../lib/haptics";
+import { useReceipts } from "../state/receipts";
 
 // SPEC 9.1. The Read-Back Rule is SPEC 1's first system behaviour — nothing
 // executes until Penny states exactly what will happen and is confirmed — so
@@ -94,6 +95,12 @@ export function cancelOpenSheet(): boolean {
   return true;
 }
 
+// SPEC 11.7's priority rule turns on this: sheet-scoped intents "override
+// everything" while a dialog is open, and are not eligible at all when none is.
+export function isSheetOpen(): boolean {
+  return openSheet !== null;
+}
+
 export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCancel }: Props) {
   const lastTap = useRef(0);
   // One decision per sheet. Without this a fast double-tap *on* the Confirm
@@ -180,5 +187,68 @@ export default function ConfirmSheet({ readback, actionLabel, onConfirm, onCance
         Cancel
       </button>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The order-card flow (SPEC 11.1 step 8, reachable from SPEC 11.7's `order_card`)
+// ---------------------------------------------------------------------------
+
+// SPEC 11.7 makes `order_card` a GLOBAL intent — "order my card" has to work
+// from any screen — while SPEC 10 keeps the button on Post Box. The flow
+// therefore moved up here out of screens/PostBox.tsx, where it used to live as
+// local state: a global intent could otherwise only reach it by duplicating the
+// read-back and the receipt write, and two copies of an account consequence is
+// exactly the thing SPEC 1's Read-Back Rule exists to prevent drifting.
+//
+// So there is now ONE implementation with two ways in. The button calls
+// requestOrderCard(); so does voice. The receipt records which.
+//
+// It lives in this file rather than a new one for the reason P5 put
+// useDialogSheet() here and P6 put the sheet registry here: SPEC 3's tree names
+// no module for it, and this is the module that owns the sheet.
+let openOrderCard: (() => void) | null = null;
+
+export function requestOrderCard(): void {
+  openOrderCard?.();
+}
+
+export function OrderCardSheet() {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    openOrderCard = () => setOpen(true);
+    return () => {
+      openOrderCard = null;
+    };
+  }, []);
+
+  if (!open) return null;
+
+  // SPEC 11.1 step 8's exact payload, moved verbatim.
+  async function confirm(method: ConfirmMethod) {
+    setOpen(false);
+    await useReceipts.getState().addReceipt({
+      action: "Replacement card ordered",
+      details: "Arriving in 5 working days to home address",
+      method,
+    });
+    void speak({ id: "done_receipt" });
+  }
+
+  return (
+    <ConfirmSheet
+      // SPEC 11.1 step 8, verbatim. `text` spells the number and `id` names the
+      // recording of it, so the live region reads "42 Lavender Grove" while the
+      // audio says "forty two".
+      readback={{
+        id: "readback_card",
+        text: "Ordering a replacement debit card to your home address at 42 Lavender Grove. It will arrive in five working days. Double-tap to confirm.",
+      }}
+      // SPEC 4: one name for the action the whole way through.
+      actionLabel="Order replacement card"
+      onConfirm={(method) => void confirm(method)}
+      onCancel={() => setOpen(false)}
+    />
   );
 }

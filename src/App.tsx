@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { OrderCardSheet } from "./components/ConfirmSheet";
 import DirectorPanel from "./components/DirectorPanel";
 import Header from "./components/Header";
 import LiveRegion from "./components/LiveRegion";
@@ -12,8 +13,7 @@ import PostBox from "./screens/PostBox";
 import Receipts from "./screens/Receipts";
 import Settings from "./screens/Settings";
 import Journey from "./screens/Journey";
-import { runIntent } from "./lib/intents";
-import { listen, speechRecognitionSupported } from "./lib/voiceInput";
+import { listen, runIntent, speechRecognitionSupported } from "./lib/voiceInput";
 import { useDirector } from "./state/director";
 import { useSession } from "./state/session";
 import { useSettings } from "./state/settings";
@@ -50,14 +50,50 @@ const TITLES: Record<string, string> = {
 // setting, which is the control that names this feature.
 function MicButton() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const voiceInput = useSettings((state) => state.voiceInput);
+  const alwaysListening = useSettings((state) => state.alwaysListening);
   const [listening, setListening] = useState(false);
   const stop = useRef<(() => void) | null>(null);
 
   // Support is a property of the browser, not of a render, so it is read once.
   const [supported] = useState(speechRecognitionSupported);
 
+  // SPEC 11.7 scopes intents by "the current route", and a recogniser result
+  // arrives long after the callback that will read it was created — so the route
+  // is taken from a ref rather than closed over. Saying "explain" on Post Box
+  // must reach the reading mode even if the mic was tapped on the way in.
+  const route = useRef(pathname);
+  route.current = pathname;
+
+  const begin = () => {
+    setListening(true);
+    stop.current = listen({
+      onResult: (transcript) => runIntent(transcript, { route: route.current, navigate }),
+      onEnd: () => setListening(false),
+    });
+  };
+
   useEffect(() => () => stop.current?.(), []);
+
+  // SPEC 11.7's "Always listening": "recognition auto-restarts on `onend` so no
+  // button press is needed". The restart itself lives inside listen(); this
+  // effect only opens the first session and closes it when the setting goes off.
+  //
+  // `listening` is deliberately NOT a dependency. With it, listen()'s own
+  // give-up guard would be undone the instant it fired — the component would
+  // reopen the session it had just abandoned, which is the loop the guard
+  // exists to end.
+  useEffect(() => {
+    if (!supported || !voiceInput || !alwaysListening) return undefined;
+
+    begin();
+    return () => {
+      stop.current?.();
+      stop.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported, voiceInput, alwaysListening]);
 
   if (!supported || !voiceInput) return null;
 
@@ -67,11 +103,7 @@ function MicButton() {
       stop.current?.();
       return;
     }
-    setListening(true);
-    stop.current = listen({
-      onResult: (transcript) => runIntent(transcript, { navigate }),
-      onEnd: () => setListening(false),
-    });
+    begin();
   };
 
   // SPEC 15 item 10: "mic button announces listening state" — aria-pressed
@@ -132,6 +164,11 @@ export default function App() {
               the nav in DOM order as well as visually. */}
           <MicButton />
           {pendingTap && <TapTellSheet push={pendingTap} />}
+          {/* SPEC 11.7 makes `order_card` global, so the sheet it raises is
+              mounted app-wide rather than inside Post Box. Like the payment
+              sheet and the text cards it renders nothing until asked, so SPEC
+              16's route walk never sees it. */}
+          <OrderCardSheet />
           <TextCards />
           <DirectorPanel />
         </>

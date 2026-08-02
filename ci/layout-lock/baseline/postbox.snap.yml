@@ -2,9 +2,8 @@
   - heading "Post Box" [level=1]
   - button "Quiet Mode"
 - main:
-  - text: Photograph a letter
+  - text: Photograph a letter Point at any letter — bank or not.
   - button "Photograph a letter"
-  - paragraph: Point at any letter — bank or not.
 - navigation:
   - list:
     - listitem:

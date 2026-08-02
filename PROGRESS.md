@@ -1330,3 +1330,261 @@ THREE ITEMS FOR THE HUMAN (P7 closes the build; these are not code):
   about what TalkBack UTTERS, plus P2's and P5's items (speechSynthesis audible
   for runtime-composed lines, navigator.vibrate producing §8's three patterns).
 - Time the masking on the handset, per the measurement above.
+
+P8 — complete
+
+Voice control surface per SPEC §17 P8: §11.7 in full. lib/intents.ts rewritten as
+pure phrase data plus a pure matcher; lib/voiceInput.ts gains the dispatch table;
+the order-card flow moved to components/ConfirmSheet.tsx as an app-level host;
+verifyChainAloud() extracted from screens/Receipts.tsx; mode and era registries in
+PostBox and Journey; the Always listening setting; Post Box's full-bleed idle
+label; audio.ts's lastSpoken and stopSpeaking(); earcons.ts's stopEarcons(); and a
+deliberately migrated Layout Lock baseline.
+
+30 intents, 350 phrases, 8-12 per intent. Zero new runtime dependencies, zero new
+screens or routes, and NOT ONE of the fifteen committed MP3s regenerated — every
+new line is runtime TTS through /api/tts with §6.3 step 5 behind it. The existing
+flows keep their fixed-line ids (readback_card, cancel_ok, quiet_on, chain_ok,
+done_receipt).
+
+SPEC AMENDMENT (§11.7 new, §17 P8, §10's Settings list), directed by the user and
+committed separately as `spec: §11.7 voice control surface`. §19 bans additional
+settings; §11.7 creates exactly one exception, the Always listening toggle, and
+records why in the section itself. Nothing else in §19 is relaxed.
+
+Decisions referred to the user (in each case the spec states two things):
+- Two §10 controls had no phrasing. §11.7's table gives none to "Always
+  listening" — the toggle it itself adds — or to "Demo mode", while §17 P8's
+  acceptance criterion is that EVERY §10 control is reachable by voice. Agreed:
+  add four intents (always_listening_on/off, demo_mode_on/off), taking the count
+  from 26 to 30. Without them the criterion could only have been reported failed.
+- verify_chain's broken path. §11.7 says the broken index is SPOKEN. §10 gives a
+  spoken line to the intact case only, and P4 deliberately routed the broken case
+  to aria-live alone. P8's own constraint is that a voice intent calls the same
+  function the button calls, so one of the two had to move. Agreed: both paths now
+  speak "Broken at entry {n}." through runtime TTS. P4's reasoning is superseded,
+  not lost — speak() mirrors to the live region anyway, so the screen-reader
+  announcement P4 was protecting still happens, and in Quiet Mode the line becomes
+  a TextCard like every other.
+
+FINDING — the matcher could not be unit-tested where the intents lived:
+  §11.7 wants INTENTS to be pure data and matchIntent() to be a pure function, and
+  P8's test criterion is that every phrase resolves to its own intent — an
+  assertion only worth writing if it iterates INTENTS itself, since the claim
+  "no §10 control is voice-unreachable" is a claim about this table. But P6's
+  intents.ts imported ConfirmSheet.tsx and Receipts.tsx, and `node --test` cannot
+  load JSX.
+  Passing those two actions in through a context object did not fix it either.
+  intents.ts still reached lib/audio.ts -> data/voiceLines.ts, which imports JSON
+  with no import attribute — Node's ESM requires `with { type: "json" }` — and
+  P4's own finding that Node does no extension search would have forced .ts
+  suffixes across five more modules, for a test.
+  So the split is by MODULE, not by callback. intents.ts is the LANGUAGE and
+  imports NOTHING; voiceInput.ts is the ear and the hands and imports everything,
+  .tsx included. §3 already pairs the two files as §11.6's implementation, and
+  voiceInput.ts is not unit-tested, so it may import freely. The consequence worth
+  keeping: intents.test.ts needs no window stub at all, unlike
+  state/receipts.test.ts, which must stand in for window.localStorage before
+  zustand's persist resolves it.
+
+DERIVED — the array order inverts §11.7's own table, twice, and had to:
+  §11.7 fixes the priority tiers (sheet > screen > global) and "first match wins",
+  but the position of entries WITHIN a tier is the mechanism, and the table's own
+  order leaves two intents dead:
+  - "turn quiet mode off" contains "quiet mode", so quiet_off must precede
+    quiet_on. The table lists quiet_on first.
+  - "what did I spend on Tuesday" contains "what did I spend", so day_query must
+    precede play_week. The table lists play_week first.
+  Three more orderings are load-bearing and happen to match the table:
+  always_listening_* before listening_off and _off before _on ("always listening
+  off" contains "always listening"); listening_off before stop_speaking ("stop
+  listening" contains "stop"); and stop_speaking last among the globals, since its
+  phrases are the shortest in the file. Navigation sits last of all, so
+  "read my receipts" reads them and "receipts" goes there.
+  All five are recorded in the source beside the entries they constrain, because
+  a phrase added later in the wrong place silently kills an intent.
+
+Derived decisions (spec-silent; recorded rather than resolved silently):
+- `{day}` is a template token inside day_query's phrases, not a bare prefix plus a
+  separate weekday scan. A phrase therefore cannot fire without a day named, and
+  the test can substitute one and keep iterating INTENTS generically.
+- lastSpoken stores the whole SpeakInput, not the bare string §11.7 names, so
+  `repeat` replays a fixed line from its committed MP3 rather than re-synthesising
+  it in a different voice. It is set before §6.3 step 2's Quiet Mode branch, so
+  "say that again" works on a text card too.
+- stopSpeaking() is a generation counter, not a cleared array. §6.3's queue IS a
+  promise chain, so the way to empty it is to make every line already sitting in
+  it a no-op; resetting the chain to a fresh resolved promise would let a new line
+  start while the aborted one was still settling.
+- play()'s aborter RESOLVES rather than rejects. run()'s catch is §6.3 step 5's
+  speechSynthesis fallback, so a rejecting stop would have immediately spoken the
+  line it had just been told to stop.
+- The aria-live queue is deliberately NOT cleared. §15 makes it serial and never
+  overwritten, and §11.7 scopes the clear to "the speech queue in audio.ts":
+  silencing the speakers must not silence a screen reader.
+- stopEarcons() is exported from earcons.ts and called by the handler rather than
+  from inside audio.ts, so no import cycle forms with the module earcons.ts
+  already imports.
+- The order-card flow moved out of screens/PostBox.tsx. §11.7 makes `order_card`
+  GLOBAL while §10 keeps the button on Post Box, so the alternative was two copies
+  of an account consequence — the one thing §1's Read-Back Rule cannot afford to
+  have drift. requestOrderCard() and <OrderCardSheet/> live in
+  components/ConfirmSheet.tsx for the reason P5 put useDialogSheet() there and P6
+  the sheet registry: §3's tree names no module for it and this one owns the sheet.
+  The host renders nothing until asked, so no baseline sees it.
+- Post Box's idle label, three consequences of §11.7's "the entire main region
+  becomes the <label>": the 56px pill is a <span>, because a real <button> nested
+  in a label is invalid and would swallow the label's own click; the hint is a
+  <span class="block">, because a label's content model is phrasing content and a
+  <p> inside one is invalid HTML; and the input carries an explicit aria-label, or
+  its accessible name would absorb the hint and stop being §10's name. Masking and
+  result states keep the plain 56px pill. Element order is unchanged throughout —
+  only nesting moves.
+- Registries rather than a fifth store for the reading mode and the era, following
+  P6's registerSheet(). PostBox registers pick(), not setMode(), so voice takes
+  the identical switch-and-replay path the segmented control takes; it registers
+  only while a letter is on screen, so "explain" with nothing to read falls
+  through to the contextual offer rather than switching an invisible control.
+- Navigation announces the bare screen name ("Home.", "Receipts.", "Settings.",
+  "Sight-loss journey."). go_postbox speaks §11.7's pinned camera line instead.
+- day_query marks credits in words — "ASOS refund, plus £12.00" — rather than with
+  a sign: "-£42.30" read aloud is not a sentence. §10's rows draw the same
+  distinction visually.
+- billPhrases() moved to data/account.ts so Home's bills line and the `bills`
+  intent cannot disagree — the precedent P1 set by putting accountHealth() there
+  for P2's glance().
+- `help` and the unmatched offer share one composer. §11.7 gives help "the
+  contextual list for the current screen" and unmatched input "a warm contextual
+  offer naming what is available on the current screen" — the same list, so one
+  implementation and no drift. `repeat` with nothing spoken yet, and mode_*/era_*
+  with no screen registered, fall through to it rather than going silent.
+- Always listening: the restart lives inside listen(), and App.tsx's effect
+  deliberately does NOT depend on `listening` — with it, listen()'s own give-up
+  guard would be undone the instant it fired. That guard (three consecutive
+  sessions that end without a result) turns the SETTING off and says so, because
+  §11.7 is silent on a denied microphone and a restart loop would otherwise spin
+  it for the rest of the session.
+- The route is read from a ref at result time, not closed over: a recogniser
+  result arrives long after the callback that reads it was created, and §11.7
+  scopes intents by "the current route".
+- isSheetOpen() is read inside runIntent() for the same reason — a sheet can open
+  or close between the tap and the transcript, and §11.7's priority rule is about
+  the moment the customer spoke.
+- No new unit tests beyond the matcher, as instructed. Everything else P8 adds is
+  DOM and side effects, verified in the browser as every phase since P2 has done.
+
+OBSERVATION — Post Box's two text nodes merged in the baseline:
+  postbox.snap.yml carried `text: Photograph a letter` and `paragraph: Point at any
+  letter — bank or not.` as separate nodes. With the hint inside the label they are
+  one text run, `text: Photograph a letter Point at any letter — bank or not.`,
+  while `button "Photograph a letter"` is unchanged — which is exactly what the
+  input's new aria-label protects. This is Playwright merging adjacent text within
+  a container, not content going missing: both sentences are still in the tree, in
+  order. Recorded so the merge is not mistaken for a regression, in the same spirit
+  as P7's note that this control appears twice.
+
+LAYOUT LOCK MIGRATION (deliberate, and the reason §17 P8 names one):
+  Two legitimate accessibility-tree changes — §10's fourth Settings toggle and
+  §11.7's full-bleed Post Box label. lock:check was run BEFORE migrating and failed
+  correctly, on exactly those two routes and no others. lock:baseline without
+  LOCK_MIGRATION=1 printed §16's refusal verbatim and exited 1. With the flag, all
+  five baselines were rewritten; `git diff ci/layout-lock/baseline/` shows only
+  postbox.snap.yml and settings.snap.yml changed — home, receipts and journey are
+  byte-identical, which is the evidence the migration is scoped to the two intended
+  changes and did not quietly enshrine a third.
+
+Verified (390×844 Chromium against `vite preview`, i.e. §16's own harness; the
+recogniser, speech, the shared audio element, AudioContext and vibrate were all
+wrapped from OUTSIDE via addInitScript, so no debug hooks were added to shipped
+code):
+- tsc --noEmit clean; npm run build ok (1058 modules); npm test 14/14 — P4's ten
+  plus P8's four
+- the matcher: all 350 phrases across 30 intents resolve to their OWN intent, the
+  assertion iterating INTENTS itself so a shadowed phrase fails rather than hides;
+  "stop" is `cancel` with a sheet open and `stop_speaking` without; sheet, mode and
+  era phrases are not merely outranked off their scope but ineligible; day_query
+  extracts all seven weekdays and "what did I spend" without one is play_week;
+  nonsense returns null in every scope and no offer contains "try saying"
+- 33/33 on the intents themselves: five navigations land on their route and
+  announce arrival; glance and playWeek run ("Played seven days. One unusual
+  payment on Saturday."); bills speaks "British Gas £84 due Wednesday."; all seven
+  day_query lines are exact, including "Monday: Tesco, £42.30. ASOS refund, plus
+  £12.00." and "Sunday: From savings, plus £150.00."; read_receipts composes §11.5
+  WITHOUT navigating; verify_chain plays chain_ok.mp3; all four new toggles flip
+  the persisted setting and announce it; repeat replays the previous line; help and
+  unmatched both speak §11.7's Home offer verbatim; era phrases move the slider's
+  aria-valuetext and are inert on Home; listening_off removes the mic
+- 18/18 on Post Box and the order card: the idle label computes min-height 506.4px,
+  exactly 60vh at 844 (it RENDERS at 506.390625 — a sub-pixel boundary, so the
+  applied constraint is what is asserted); the input keeps the accessible name
+  "Photograph a letter"; the hint is inside the label; a photographed card letter
+  still masks BEFORE anything else ("5 items hidden on device") and then plays
+  summary_card and offer_card; "explain it to me" / "word for word" / "give me the
+  summary" each move aria-pressed AND replay that mode's text, Summary returning to
+  the recorded summary_card.mp3; the BUTTON still writes §11.1 step 8's payload
+  with method "button" and a genesis prevHash then done_receipt, so the flow
+  survived leaving PostBox.tsx; "I need a new card" from HOME raises the same
+  dialog, readback_card.mp3 plays and the live region spells "42 Lavender Grove";
+  "stop" with that sheet open CANCELS (cancel_ok, no receipt) rather than stopping
+  speech, which is §11.7's priority rule proved on the app rather than the matcher;
+  and "order my card" then "yes" writes the identical payload with method "voice"
+- 19/19 on barge-in and Quiet Mode: over a recorded MP3 (chain_ok) the audio
+  element is paused 0ms after the transcript and the sound-dot stops pulsing; over
+  the speechSynthesis path cancel() lands 0ms after; three lines queued behind the
+  stop are dropped, not merely the current one; data-live-busy returns to false, so
+  §6.3 step 6's refcount is clean and §16's gate cannot hang on it; speak() still
+  works afterwards, which a generation counter that never advanced would have
+  wedged permanently; a running playWeek is torn down and its completion line never
+  arrives. In Quiet Mode every voice response — a data line and a navigation
+  announcement — speaks nothing, renders a TextCard and still reaches the live
+  region, while the Glance still sounds
+- 31/31 on the no-regression sweep: §6.1's invariant holds (0 AudioContexts, 0
+  speechSynthesis calls and 0 audio plays before the splash tap; exactly 1
+  AudioContext after) even though voiceInput.ts now imports half the app; on all
+  five routes #root is header·main·nav, exactly one h1, the live region is the only
+  live element, every visible control is ≥48×48 and axe reports zero
+  serious/critical; Settings lists exactly Quiet Mode · Voice input · Always
+  listening · Demo mode with Always listening pressed=false and Voice input
+  pressed=true, and still ends at "Prototype v1.0". Zero console errors in every
+  run — the only network failures anywhere are /api/tts 404s, §6.3 step 5's
+  expected fallback under `vite preview`
+- tone is still absent from the 239.91 KB entry chunk and present in the 340.53 KB
+  lazy chunk; the string "try saying" appears nowhere in the build
+- §10 coverage generated FROM the INTENTS array rather than by hand: 31 controls,
+  all 31 reachable, each printed beside the real first phrase the matcher accepts
+- lock:check green THREE consecutive times after the migration ("Layout Lock ✓ 5
+  routes verified, 0 violations", exit 0); lock:demo-break exits 1 with §16's line
+  for route / verbatim, and also for /journey — the true positive P7 recorded,
+  since Journey renders <Home era="2026"/>
+
+HARNESS NOTE, for whoever re-runs this: the speech stand-in must take a REALISTIC
+time. Headless Chromium ships no voices, so a wrapped speechSynthesis has to fire
+'end' itself or §6.3's queue wedges — but firing it after 5ms leaves nothing to
+barge in on, and the first stop_speaking run "passed" against a line that had
+already finished. It now runs at roughly a speaking rate and honours cancel().
+
+NOT VOICE-REACHABLE, deliberately, and each for a reason with no workaround:
+- The Splash's "Open Penny". §6.1 blocks every audio API until it is tapped, so
+  voice does not exist yet while that control is the whole screen. Same browser
+  rule as §11.7's camera constraint.
+- Turning Voice input back ON after `listening_off`. §10 gates the mic on that
+  setting, so the control is off screen; the spoken line names Settings as the way
+  back, which is why it says so.
+- §12's director panel — not a §10 control, and deliberately hidden from customers.
+
+FOUR ITEMS FOR THE HUMAN (P8 adds the first; the rest are P7's, unchanged):
+- The voice device pass. Every phrase above was matched against a transcript the
+  harness supplied. What Chrome for Android's recogniser actually RETURNS for these
+  utterances — British accent, room noise, "twenty twenty six" versus "2026" — is
+  the one thing that cannot be measured here, and the phrase table is where it
+  would show. Say each intent aloud on the handset before filming. Turning "Always
+  listening" on for that pass is worth it; leave it off for the takes.
+- PRODUCTION IS STILL STALE. Unchanged from P7: production predates the PWA, the
+  Gemini switch, the fifteen MP3s and the SPA rewrite. Run `vercel --prod`, then
+  install from the phone and re-run scenario D on the handset.
+- The device pass for §15 items 1, 2, 4, 5 and 9 — claims about what TalkBack
+  UTTERS — plus P2's and P5's items (speechSynthesis audible for runtime-composed
+  lines, which P8 adds a great many of, and navigator.vibrate producing §8's three
+  patterns).
+- Time the masking on the handset, per P7's measurement (5.0s and 7.0s against
+  §11.1 step 2's 10s timeout).

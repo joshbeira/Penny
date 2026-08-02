@@ -1,19 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ACCOUNT, HEALTH_WORD, accountHealth } from "../data/account";
+import { ACCOUNT, HEALTH_WORD, accountHealth, billPhrases } from "../data/account";
 import { WEEK } from "../data/transactions";
 import type { Tx } from "../data/transactions";
 import { glance, playWeek } from "../lib/earcons";
 
 const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
-
-// SPEC 10 renders the bill as "British Gas £84 due Wednesday", so a trailing
-// .00 is dropped.
-const GBP_SHORT = new Intl.NumberFormat("en-GB", {
-  style: "currency",
-  currency: "GBP",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
 
 // Parsed at local midnight so the weekday never shifts by timezone: t8 has to
 // read Saturday (SPEC 7.2's "unusual payment on Saturday").
@@ -46,9 +37,9 @@ export type Era = "2019" | "2026" | "2030";
 // SPEC 10 order: balance region · the two pill buttons · the "This week" list.
 // That order is the Layout Lock baseline (SPEC 16) — never reorder.
 export default function Home({ era }: { era?: Era }) {
-  const bills = ACCOUNT.billsDueThisWeek
-    .map((bill) => `${bill.payee} ${GBP_SHORT.format(bill.amount)} due ${bill.dueLabel}`)
-    .join(" · ");
+  // SPEC 11.7's `bills` intent speaks the same phrases, so the composition moved
+  // to data/account.ts and both read it from there.
+  const bills = billPhrases().join(" · ");
 
   // SPEC 7.2's row-sync callback: playWeek calls onNote at each note's onset and
   // the row carries a 400ms amber left border. A set rather than a single id, so

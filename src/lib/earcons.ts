@@ -90,6 +90,15 @@ function teardown(): void {
   endAudioActivity();
 }
 
+// SPEC 11.7's `stop_speaking` is a barge-in over "any Tone playback", and
+// teardown() already cancels the pending Draw callbacks, clears the timers,
+// disposes every node and releases the audio refcount. Exported rather than
+// duplicated, and exported from here rather than called through audio.ts so no
+// import cycle forms with the module earcons.ts already imports.
+export function stopEarcons(): void {
+  teardown();
+}
+
 // SPEC 7.1 / 7.2 post their line "after completion", then the nodes go once the
 // envelopes have rung out — disposing on the note's edge would clip the tail.
 function finish(end: number, tail: number, line: string): void {

@@ -316,8 +316,54 @@ const ttsCache = new Map<string, string>();
 // end." Failures are absorbed into the chain so one bad line cannot wedge it.
 let queue: Promise<void> = Promise.resolve();
 
+// SPEC 11.7's `stop_speaking` barge-in. A generation counter rather than a
+// cleared array: the chain IS the queue, so the way to empty it is to make
+// every line already sitting in it a no-op. Anything queued before the stop
+// captured the old generation and skips; anything spoken after captures the new
+// one and plays. The chain's ordering guarantee survives, which resetting
+// `queue` to a fresh resolved promise would have broken — a new line could then
+// start while the aborted one was still settling.
+let generation = 0;
+
+// The in-flight playback's aborter, registered by play(). It RESOLVES rather
+// than rejects: run()'s catch is SPEC 6.3 step 5's speechSynthesis fallback, and
+// a stop that fell into it would immediately start speaking the line it had just
+// been told to stop.
+let cancelPlayback: (() => void) | null = null;
+
+// SPEC 11.7: "Halts current playback immediately (barge-in): stops the audio
+// element, speechSynthesis.cancel(), and any Tone playback." Tone is the caller's
+// job — earcons.ts exports stopEarcons() for it — which keeps this module free of
+// an import cycle with the module that already imports it.
+//
+// The aria-live queue is deliberately NOT cleared. SPEC 15 makes it a serial
+// queue that is never overwritten, and SPEC 11.7 scopes the clear to "the speech
+// queue in audio.ts": silencing the speakers must not silence a screen reader.
+export function stopSpeaking(): void {
+  generation += 1;
+  cancelPlayback?.();
+  cancelPlayback = null;
+  speechSynthesis.cancel();
+}
+
+// SPEC 11.7's `repeat`: "Replays the last spoken string — store `lastSpoken` in
+// audio.ts". The whole SpeakInput is stored rather than the bare string so a
+// fixed line replays from its committed MP3 (SPEC 6.2) instead of being
+// re-synthesised in a different voice; the string is what the mirror and the
+// card use either way.
+let lastSpoken: SpeakInput | null = null;
+
+// Returns false when Penny has not said anything yet, so the caller can offer
+// something rather than answer a question with silence.
+export function repeatLast(): boolean {
+  if (!lastSpoken) return false;
+  void speak(lastSpoken);
+  return true;
+}
+
 export function speak(input: SpeakInput): Promise<void> {
-  const next = queue.then(() => run(input)).catch(() => undefined);
+  const era = generation;
+  const next = queue.then(() => (era === generation ? run(input) : undefined)).catch(() => undefined);
   queue = next;
   return next;
 }
@@ -355,6 +401,11 @@ async function run(input: SpeakInput): Promise<void> {
   const text = input.text ?? (input.id ? lineText(input.id) : "");
   if (!text) return;
 
+  // SPEC 11.7's `repeat` reads this. Recorded here rather than in speak() so it
+  // is the line Penny actually delivered, and BEFORE the Quiet Mode branch so
+  // "say that again" works on a text card too.
+  lastSpoken = input;
+
   // SPEC 6.3 step 1 — ALWAYS, in every mode. Screen-reader parity.
   announce(text);
 
@@ -375,17 +426,26 @@ async function run(input: SpeakInput): Promise<void> {
   // reachable afterwards, but the invariant is load-bearing enough to enforce.
   if (!useSession.getState().unlocked) return;
 
+  // A stop landing during the /api/tts round trip must not be undone by the
+  // response arriving afterwards, so the generation is re-checked either side of
+  // every await that can outlive it.
+  const era = generation;
+
   beginAudioActivity();
   try {
     // SPEC 6.3 step 3, then step 4.
     const url = input.id ? `/audio/${input.id}.mp3` : await ttsUrl(text);
+    if (era !== generation) return;
     await play(url);
   } catch {
+    if (era !== generation) return;
     // SPEC 6.3 step 5 — ANY failure: missing file, network, non-200, bad body.
     // With no fixed-line MP3s recorded and /api/tts answering 502 without an
     // ELEVENLABS_API_KEY, this is the live path for every line today.
     await synthesise(text);
   } finally {
+    // Reached on every path including the barge-in, so SPEC 6.3 step 6's
+    // refcount — and with it SPEC 15's data-live-busy — can never stick high.
     endAudioActivity();
   }
 }
@@ -417,6 +477,7 @@ function play(url: string): Promise<void> {
     const cleanup = () => {
       player.removeEventListener("ended", onEnded);
       player.removeEventListener("error", onError);
+      if (cancelPlayback === abort) cancelPlayback = null;
     };
     const onEnded = () => {
       cleanup();
@@ -426,7 +487,17 @@ function play(url: string): Promise<void> {
       cleanup();
       reject(new Error(`Playback failed: ${url}`));
     };
+    // SPEC 11.7's barge-in. pause() is what stops the sound; resolving rather
+    // than rejecting is what keeps run()'s catch — the speechSynthesis fallback
+    // — from speaking the line we were just told to stop. The later AbortError
+    // from the pending play() lands on an already-settled promise.
+    const abort = () => {
+      cleanup();
+      player.pause();
+      resolve();
+    };
 
+    cancelPlayback = abort;
     player.addEventListener("ended", onEnded);
     player.addEventListener("error", onError);
     player.src = url;
