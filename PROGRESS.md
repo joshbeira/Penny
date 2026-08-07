@@ -1644,3 +1644,53 @@ Verified (390×844 Chromium, deviceScaleFactor 3, against `vite preview`):
 - tsc --noEmit clean; npm test 14/14; and all four P8 harnesses re-run against
   the animated button: 33/33 intents, 18/18 Post Box and order card, 19/19
   barge-in and Quiet Mode, 31/31 no-regression, zero console errors
+
+Ship — production URL and QR codes (2026-08-07)
+
+All eight phases are complete, so the deployment was given a name a judge can
+read off a slide and type from memory.
+
+PRODUCTION URL: https://hey-penny.vercel.app
+
+Chosen by the user over meet-penny, penny-voice and usepenny. `penny.vercel.app`
+and `penny-app.vercel.app` are both already claimed by other Vercel accounts.
+The name reads like the wake phrase, which is the point of SPEC 1's voice-first
+framing.
+
+How it is wired, because this is not in git:
+- It is an alias on Vercel project `penny` (org josh-0b71), created with
+  `vercel alias set`. `vercel domains add` REJECTS `.vercel.app` names outright
+   — it demands DNS verification for a domain Vercel itself owns — so
+  `vercel alias set` is the only route.
+- Verified that the alias auto-moves: a fresh `vercel --prod` produced
+  penny-ndx2yzuya and hey-penny.vercel.app followed it without being re-set.
+  So deploying needs no alias step. The generated penny-gules-six.vercel.app
+  still resolves to the same deployments.
+
+Verified against the live URL:
+- all five SPEC 10 routes 200 (/ /postbox /journey /receipts /settings), so the
+  SPA rewrite from the P7 fix still holds on the aliased host
+- /manifest.webmanifest and /sw.js 200 with correct content types — the PWA
+  install path is intact, which scenario D depends on
+- HTTPS with HSTS max-age=63072000; includeSubDomains; preload. Camera,
+  vibration and PWA install all require the secure context (SPEC 0).
+- the served entry bundle is BYTE-IDENTICAL to a local `npm run build` of HEAD
+  (b9b75a8). Worth recording: the previous production deployment was byte-
+  identical too, despite carrying a different Vite content hash in its filename
+   — the hash differs between a local build and a Vercel build while the emitted
+  code does not, so a filename mismatch alone is not evidence of drift.
+
+QR codes in qr/, encoding https://hey-penny.vercel.app:
+- penny-qr.png — 2048px, ECC M, quiet zone 4. The safe one for print.
+- penny-qr.svg — same symbol, vector.
+- penny-qr-card.svg / .png — a slide card on the SPEC 4 tokens: #101418 ground,
+  the amber sound-dot and wordmark, URL in #FFB703, Arial.
+
+The symbol itself is pure #101418 on #FFFFFF in every variant. Tinting the
+modules amber was rejected: scanners key on module contrast, and the branding
+does its work in the surround instead.
+
+Decode-verified with an independent decoder (jsQR, run from a scratch install,
+not added to the project), not merely generated: all four files decode to the
+exact URL, and penny-qr.png still decodes downscaled to 128px — the margin that
+matters when it is shrunk on a slide or filmed off a screen.
