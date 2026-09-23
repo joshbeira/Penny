@@ -1,3 +1,5 @@
+- link "Skip to content":
+  - /url: "#main-content"
 - banner:
   - heading "One customer. Three years." [level=1]
   - button "Quiet Mode"

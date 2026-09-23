@@ -1,3 +1,5 @@
+- link "Skip to content":
+  - /url: "#main-content"
 - banner:
   - heading "Settings" [level=1]
   - button "Quiet Mode"
@@ -11,11 +13,20 @@
       - button "Always listening"
     - listitem:
       - button "Demo mode"
+  - link "Explore the banking sandbox":
+    - /url: /sandbox
   - link "Sight-loss journey demo":
     - /url: /journey
   - heading "About Penny" [level=2]
-  - paragraph: Nothing happens until Penny reads it back and you confirm. Every action leaves a receipt.
-  - paragraph: Prototype v1.0
+  - paragraph: Penny reads printed English letters on your device. Banking interactions use sample data and do not connect to a bank.
+  - paragraph: Voice input uses your browser’s speech recognition service and may send audio to its provider. Always listening is optional and off by default. Speech output uses an installed on-device voice when available.
+  - link "Share feedback":
+    - /url: https://github.com/joshbeira/Penny/issues/new?template=feedback.yml
+  - link "Privacy and data":
+    - /url: https://github.com/joshbeira/Penny/blob/main/docs/PRIVACY.md
+  - link "Source code and user guide":
+    - /url: https://github.com/joshbeira/Penny
+  - paragraph: Public beta · v1.1.0
 - navigation:
   - list:
     - listitem:

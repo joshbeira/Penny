@@ -1,0 +1,10 @@
+node_modules
+dist
+public/tesseract
+public/audio
+public/icons
+qr
+package-lock.json
+ci/layout-lock/baseline
+playwright-report
+test-results

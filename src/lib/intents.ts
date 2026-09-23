@@ -1,33 +1,3 @@
-// SPEC 11.7 — the voice control surface.
-//
-// The governing principle is that a button a blind customer cannot find is not a
-// control: every interactive element in SPEC 10 has at least one phrasing here,
-// and the button is only the sighted affordance.
-//
-// This module is the LANGUAGE, in two parts:
-//   1. INTENTS — pure data. Ids, scopes and phrase lists, nothing else, so a
-//      phrasing can be extended without touching flow code.
-//   2. The matcher — normalise(), matchIntent(), contextualOffer(). Pure
-//      functions, no side effects, no flow logic.
-//
-// The HANDS are next door in voiceInput.ts, which owns the recogniser and the
-// dispatch table and calls the same functions SPEC 10's buttons call.
-//
-// This file imports NOTHING. That is deliberate rather than incidental: it is
-// what lets src/lib/intents.test.ts load the matcher under `node --test` with
-// no DOM, no stubbed storage and no bundler — and the claim P8 makes, that no
-// SPEC 10 control is voice-unreachable, is a claim about this table that only a
-// test iterating it can keep honest.
-
-// ---------------------------------------------------------------------------
-// 1. INTENTS — pure data
-// ---------------------------------------------------------------------------
-
-// SPEC 11.7's priority order is "(1) sheet-scoped when a dialog is open — these
-// override everything; (2) screen-scoped; (3) global", and within that, "first
-// match wins". So THE ARRAY ORDER BELOW IS THE SPECIFICATION, not a detail:
-// scope decides which entries are eligible, position decides which of the
-// eligible ones wins.
 export type Scope = "sheet" | "postbox" | "journey" | "global";
 
 export type IntentId =
@@ -63,15 +33,7 @@ export type IntentId =
   | "go_journey";
 
 export type Intent = { id: IntentId; scope: Scope; phrases: string[] };
-
-// Every phrase is stored already normalised — lower case, no punctuation, no
-// contractions — so matching is a substring test and nothing more.
-//
-// `{day}` in the day_query phrases is the one template token. It expands
-// against the seven weekday names at match time and the match is what fills
-// params.day, so a phrase only fires when a real day was actually named.
 export const INTENTS: Intent[] = [
-  // ---- Sheet scope. SPEC 11.7: "these override everything." -----------------
   {
     id: "confirm",
     scope: "sheet",
@@ -108,8 +70,6 @@ export const INTENTS: Intent[] = [
       "hold on",
     ],
   },
-
-  // ---- Post Box screen scope (SPEC 10's three reading modes) ----------------
   {
     id: "mode_summary",
     scope: "postbox",
@@ -164,8 +124,6 @@ export const INTENTS: Intent[] = [
       "what is it about",
     ],
   },
-
-  // ---- Journey screen scope (SPEC 10's slider) -----------------------------
   {
     id: "era_2019",
     scope: "journey",
@@ -220,24 +178,6 @@ export const INTENTS: Intent[] = [
       "the end",
     ],
   },
-
-  // ---- Global scope --------------------------------------------------------
-  //
-  // Four ORDERING RULES hold this section together. Each exists because the
-  // alternative makes an intent unreachable, which SPEC 11.7's own principle
-  // forbids:
-  //
-  //   a) always_listening_* before listening_off, and _off before _on —
-  //      "always listening off" contains "always listening".
-  //   b) quiet_off before quiet_on — "turn quiet mode off" contains
-  //      "quiet mode". This inverts SPEC 11.7's table order, which lists
-  //      quiet_on first; the table's order would leave quiet_off dead.
-  //   c) day_query before play_week — "what did I spend on Tuesday" contains
-  //      "what did I spend". Same inversion, same reason.
-  //   d) stop_speaking last among the globals, and listening_off before it —
-  //      its phrases are the shortest in the file ("stop", "enough"), so
-  //      anything it precedes it would swallow. "stop listening" and
-  //      "stop the microphone" reach listening_off for exactly this reason.
   {
     id: "always_listening_off",
     scope: "global",
@@ -534,10 +474,6 @@ export const INTENTS: Intent[] = [
       "wait",
     ],
   },
-
-  // ---- Navigation. Global reach, but LAST, so a longer intent phrase always
-  // wins over a bare screen name: "read my receipts" reads them, "receipts"
-  // goes there.
   {
     id: "go_home",
     scope: "global",
@@ -630,10 +566,6 @@ export const INTENTS: Intent[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// 2. The matcher — pure
-// ---------------------------------------------------------------------------
-
 export type MatchContext = { route: string; sheetOpen: boolean };
 export type IntentParams = { day?: string };
 export type Match = { intentId: IntentId; params: IntentParams };
@@ -647,12 +579,6 @@ const WEEKDAYS = [
   "saturday",
   "sunday",
 ];
-
-// SPEC 11.7: "expand contractions (what's → what is, don't → do not, I'm → I
-// am)". The three named are the pattern, not the whole set — a recogniser
-// returns whatever the customer said, so the ones a customer would actually use
-// on these phrasings are all here. Order matters: the longer left-hand sides go
-// first so "what's" is not half-eaten by a shorter rule.
 const CONTRACTIONS: [RegExp, string][] = [
   [/\bcan't\b/g, "cannot"],
   [/\bwon't\b/g, "will not"],
@@ -666,14 +592,10 @@ const CONTRACTIONS: [RegExp, string][] = [
   [/\b(\w+)'d\b/g, "$1 would"],
   [/\b(\w+)'s\b/g, "$1 is"],
 ];
-
-// SPEC 11.7: "lowercase, strip punctuation, expand contractions …, collapse
-// whitespace". Contractions are expanded BEFORE punctuation is stripped, since
-// the apostrophe is the thing they hang on; curly apostrophes are folded first
-// because that is what a speech recogniser actually returns.
 export function normalise(transcript: string): string {
   let text = transcript.toLowerCase().replace(/[‘’ʼ`]/g, "'");
-  for (const [pattern, replacement] of CONTRACTIONS) text = text.replace(pattern, replacement);
+  for (const [pattern, replacement] of CONTRACTIONS)
+    text = text.replace(pattern, replacement);
   return text
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -681,17 +603,11 @@ export function normalise(transcript: string): string {
 }
 
 function eligible(intent: Intent, context: MatchContext): boolean {
-  // SPEC 11.7 priority (1): sheet-scoped intents apply only while a dialog is
-  // open, and then they outrank everything — which they do by sitting first.
   if (intent.scope === "sheet") return context.sheetOpen;
   if (intent.scope === "postbox") return context.route === "/postbox";
   if (intent.scope === "journey") return context.route === "/journey";
   return true;
 }
-
-// SPEC 11.7: "A phrase matches if the normalised transcript contains it as a
-// substring or equals it." `{day}` expands across the seven weekdays and the
-// winner is returned as params.day, so day_query cannot fire without a day.
 function phraseHit(phrase: string, heard: string): IntentParams | null {
   if (!phrase.includes("{day}")) return heard.includes(phrase) ? {} : null;
 
@@ -700,10 +616,10 @@ function phraseHit(phrase: string, heard: string): IntentParams | null {
   }
   return null;
 }
-
-// SPEC 11.7: "Matching is deterministic and priority-ordered — first match wins,
-// no model."
-export function matchIntent(transcript: string, context: MatchContext): Match | null {
+export function matchIntent(
+  transcript: string,
+  context: MatchContext,
+): Match | null {
   const heard = normalise(transcript);
   if (!heard) return null;
 
@@ -717,13 +633,6 @@ export function matchIntent(transcript: string, context: MatchContext): Match | 
   }
   return null;
 }
-
-// SPEC 11.7's unmatched-input rule: "Never say 'try saying'. Speak a warm
-// contextual offer naming what is available on the current screen." The Home
-// line is the spec's own; the rest are composed the same way, from the intents
-// that screen actually has. `help` speaks this too — SPEC 11.7 gives it "the
-// contextual list for the current screen", which is the same list, so there is
-// one implementation and they can never drift apart.
 const OFFERS: Record<string, string> = {
   "/": "I can check your balance, play your week, read a letter, or read your receipts. Which one?",
   "/postbox":
@@ -737,6 +646,5 @@ const OFFERS: Record<string, string> = {
 };
 
 export function contextualOffer(route: string): string {
-  // SPEC 12.1's /director renders Home behind the panel, so it offers Home's.
   return OFFERS[route] ?? OFFERS["/"];
 }

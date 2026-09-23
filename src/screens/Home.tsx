@@ -1,50 +1,40 @@
+import { Link } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ACCOUNT, HEALTH_WORD, accountHealth, billPhrases } from "../data/account";
+import {
+  ACCOUNT,
+  HEALTH_WORD,
+  accountHealth,
+  billPhrases,
+} from "../data/account";
 import { WEEK } from "../data/transactions";
 import type { Tx } from "../data/transactions";
 import { glance, playWeek } from "../lib/earcons";
 
-const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
-
-// Parsed at local midnight so the weekday never shifts by timezone: t8 has to
-// read Saturday (SPEC 7.2's "unusual payment on Saturday").
+const GBP = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+});
 function dayShortName(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", { weekday: "short" });
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-GB", {
+    weekday: "short",
+  });
 }
 
 function signedAmount(amount: number): string {
   return `${amount > 0 ? "+" : "-"}${GBP.format(Math.abs(amount))}`;
 }
-
-// SPEC 4: sentence case everywhere.
 function categoryLabel(category: Tx["category"]): string {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
 const PILL =
   "flex min-h-[48px] items-center justify-center rounded-full border border-amber px-6 text-body text-amber";
-
-// SPEC 10's Journey: "Implement as an `era` prop on Home selecting one of three
-// preset class sets; default era "2026" behaves as the normal Home (no visual
-// difference at scale 1.0 — the presets only apply inside Journey's preview)."
-//
-// The prop is therefore OPTIONAL, and absent is what the router renders: the
-// full Home, unstyled by any preset. That is the only reading under which 2026
-// can both name a reduced preview (balance + buttons + anomaly row) and leave
-// the real screen untouched. Journey always passes an era explicitly.
 export type Era = "2019" | "2026" | "2030";
-
-// SPEC 10 order: balance region · the two pill buttons · the "This week" list.
-// That order is the Layout Lock baseline (SPEC 16) — never reorder.
 export default function Home({ era }: { era?: Era }) {
-  // SPEC 11.7's `bills` intent speaks the same phrases, so the composition moved
-  // to data/account.ts and both read it from there.
   const bills = billPhrases().join(" · ");
-
-  // SPEC 7.2's row-sync callback: playWeek calls onNote at each note's onset and
-  // the row carries a 400ms amber left border. A set rather than a single id, so
-  // two transactions on the same day (0.12s apart) each get their full flash.
-  const [flashing, setFlashing] = useState<ReadonlySet<string>>(() => new Set());
+  const [flashing, setFlashing] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const timers = useRef<number[]>([]);
 
   useEffect(
@@ -68,17 +58,25 @@ export default function Home({ era }: { era?: Era }) {
   }, []);
 
   const glanceButton = (
-    <button key="glance" type="button" className={PILL} onClick={() => void glance()}>
+    <button
+      key="glance"
+      type="button"
+      className={PILL}
+      onClick={() => void glance()}
+    >
       Play the Glance
     </button>
   );
   const weekButton = (
-    <button key="week" type="button" className={PILL} onClick={() => void playWeek(WEEK, flash)}>
+    <button
+      key="week"
+      type="button"
+      className={PILL}
+      onClick={() => void playWeek(WEEK, flash)}
+    >
       Play my week
     </button>
   );
-
-  // SPEC 10 / 16: this swap exists ONLY to demo the CI gate failing.
   const buttons =
     import.meta.env.VITE_BREAK_LAYOUT === "1"
       ? [weekButton, glanceButton]
@@ -102,25 +100,27 @@ export default function Home({ era }: { era?: Era }) {
         <span className="shrink-0 text-caption text-text-dim">{day}</span>
         <span className="min-w-0 flex-1 truncate">{tx.merchant}</span>
         <span className="shrink-0 text-caption text-text-dim">{category}</span>
-        {tx.isAnomaly && <span className="shrink-0 text-caption text-amber">Unusual</span>}
-        <span className={`shrink-0 ${tx.amount > 0 ? "text-amber" : ""}`}>{amount}</span>
+        {tx.isAnomaly && (
+          <span className="shrink-0 text-caption text-amber">Unusual</span>
+        )}
+        <span className={`shrink-0 ${tx.amount > 0 ? "text-amber" : ""}`}>
+          {amount}
+        </span>
       </li>
     );
   };
 
   const balance = (
-    <section aria-label="Current account balance" className="rounded-2xl bg-surface p-4">
+    <section
+      aria-label="Current account balance"
+      className="rounded-2xl bg-surface p-4"
+    >
       <p className="text-caption text-text-dim">{ACCOUNT.label}</p>
       <p className="text-amount">{GBP.format(ACCOUNT.balance)}</p>
       <p className="text-card text-amber">{HEALTH_WORD[accountHealth()]}</p>
       <p className="text-caption text-text-dim">{bills}</p>
     </section>
   );
-
-  // SPEC 10's 2030 preview: "only the health word at 64px + one 96px round amber
-  // button labelled Glance (replays glance()) + caption 'Sound and touch only'".
-  // The button is the single interactive element in any preview, which is why
-  // Journey leaves this era alone rather than marking it inert.
   if (era === "2030") {
     return (
       <div className="flex flex-col items-center gap-6 py-8">
@@ -136,9 +136,6 @@ export default function Home({ era }: { era?: Era }) {
       </div>
     );
   }
-
-  // SPEC 10's 2026 preview: "only balance region + the two buttons + the anomaly
-  // row; chip 'Speech-first'".
   if (era === "2026") {
     return (
       <>
@@ -151,11 +148,40 @@ export default function Home({ era }: { era?: Era }) {
       </>
     );
   }
-
-  // No era (the router's Home) and SPEC 10's 2019 preview ("full UI") render the
-  // same tree; 2019 differs only by its preset class set on the wrapper.
   return (
     <>
+      {!era && (
+        <section className="home-intro">
+          <p className="eyebrow">Penny · Public beta</p>
+          <h2 className="reader-title">
+            A little clarity.
+            <br />A lot more independence.
+          </h2>
+          <p className="text-text-dim">
+            Read everyday letters with your eyes, your ears, or both. Private
+            on-device reading, designed around your pace.
+          </p>
+          <Link className="primary-link" to="/postbox">
+            Read a letter <span aria-hidden="true">↗</span>
+          </Link>
+          <div className="feature-strip">
+            <span>No account</span>
+            <span>On-device OCR</span>
+            <span>Voice + text</span>
+          </div>
+          <a
+            className="feedback-link"
+            href="https://github.com/joshbeira/Penny/issues/new?template=feedback.yml"
+          >
+            Help shape Penny — share your experience
+          </a>
+          <h2 className="mt-8 text-card">Explore accessible banking</h2>
+          <p className="text-caption text-text-dim">
+            The account below is a sandbox with sample data. Payments and card
+            orders are simulations.
+          </p>
+        </section>
+      )}
       {balance}
 
       <div className="mt-4 flex flex-col gap-3">{buttons}</div>

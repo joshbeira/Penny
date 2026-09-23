@@ -1,9 +1,14 @@
+- link "Skip to content":
+  - /url: "#main-content"
 - banner:
   - heading "Receipts" [level=1]
   - button "Quiet Mode"
 - main:
+  - paragraph: Practice receipts stored in this browser. Chain verification detects inconsistent edits, but cannot prove the history was never rewritten.
   - button "Read my receipts"
   - button "Verify chain"
+  - button "Export receipts" [disabled]
+  - button "Delete receipts" [disabled]
   - paragraph: No receipts yet. Receipts are written every time Penny acts.
 - navigation:
   - list:

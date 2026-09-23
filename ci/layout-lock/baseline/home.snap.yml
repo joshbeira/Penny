@@ -1,7 +1,19 @@
+- link "Skip to content":
+  - /url: "#main-content"
 - banner:
   - heading "Home" [level=1]
   - button "Quiet Mode"
 - main:
+  - paragraph: Penny · Public beta
+  - heading "A little clarity. A lot more independence." [level=2]
+  - paragraph: Read everyday letters with your eyes, your ears, or both. Private on-device reading, designed around your pace.
+  - link "Read a letter":
+    - /url: /postbox
+  - text: No account On-device OCR Voice + text
+  - link "Help shape Penny — share your experience":
+    - /url: https://github.com/joshbeira/Penny/issues/new?template=feedback.yml
+  - heading "Explore accessible banking" [level=2]
+  - paragraph: The account below is a sandbox with sample data. Payments and card orders are simulations.
   - region "Current account balance":
     - paragraph: Current account
     - paragraph: £1,842.60
@@ -35,4 +47,4 @@
       - link "Settings":
         - /url: /settings
 - button "Talk to Penny"
-- status: Steady. One bill this week. One unusual payment.
+- status: Hi. I'm Penny.

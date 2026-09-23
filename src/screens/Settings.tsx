@@ -1,11 +1,6 @@
 import { Link } from "react-router-dom";
 import { enterQuietMode } from "../lib/audio";
 import { useSettings } from "../state/settings";
-
-// SPEC 10 specifies aria-pressed for the Header's Quiet Mode toggle, so the
-// three Settings toggles use the same pattern. The track is aria-hidden, which
-// keeps each button's accessible name exactly its label — aria-pressed already
-// carries the state.
 function Toggle({
   label,
   checked,
@@ -27,7 +22,9 @@ function Toggle({
         <span
           aria-hidden="true"
           className={`flex h-[28px] w-[52px] shrink-0 items-center rounded-full border p-[2px] ${
-            checked ? "justify-end border-amber bg-amber" : "justify-start border-hairline bg-surface"
+            checked
+              ? "justify-end border-amber bg-amber"
+              : "justify-start border-hairline bg-surface"
           }`}
         >
           <span
@@ -38,17 +35,6 @@ function Toggle({
     </li>
   );
 }
-
-// P3's temporary director stand-in — five armed-letter radios and P5's two push
-// buttons — was deleted here in P6. SPEC 12.2's real panel now owns all seven
-// controls (components/DirectorPanel.tsx), reached by SPEC 12.1's triple-tap or
-// /director. This screen is once again exactly SPEC 10's list, which is what
-// P7's Layout Lock baseline must enshrine.
-
-// SPEC 10 order, as amended by SPEC 11.7: Quiet Mode · Voice input · Always
-// listening · Demo mode · Journey link · About Penny. That order is the Layout
-// Lock baseline (SPEC 16) — never reorder. The fourth toggle is the one addition
-// SPEC 19 gives way to, and it is why P8 migrates the baseline deliberately.
 export default function Settings() {
   const {
     quietMode,
@@ -64,9 +50,6 @@ export default function Settings() {
   return (
     <>
       <ul>
-        {/* Turning Quiet Mode ON goes through enterQuietMode() here for the
-            same reason the Header does: SPEC 11.3's `quiet_on` has to be spoken
-            before the flag rises, and this is the same setting. */}
         <Toggle
           label="Quiet Mode"
           checked={quietMode}
@@ -75,10 +58,12 @@ export default function Settings() {
             else setQuietMode(false);
           }}
         />
-        <Toggle label="Voice input" checked={voiceInput} onChange={setVoiceInput} />
-        {/* SPEC 11.7: "When on, recognition auto-restarts on `onend` so no
-            button press is needed." Default off — a demo that starts listening
-            by itself is not a deterministic take. */}
+        <Toggle
+          label="Voice input"
+          checked={voiceInput}
+          onChange={setVoiceInput}
+        />
+
         <Toggle
           label="Always listening"
           checked={alwaysListening}
@@ -87,6 +72,9 @@ export default function Settings() {
         <Toggle label="Demo mode" checked={demoMode} onChange={setDemoMode} />
       </ul>
 
+      <Link className="feedback-link mt-4" to="/sandbox">
+        Explore the banking sandbox
+      </Link>
       <Link
         to="/journey"
         className="mt-6 flex min-h-[48px] items-center text-body text-amber"
@@ -96,9 +84,32 @@ export default function Settings() {
 
       <h2 className="mt-6 text-card">About Penny</h2>
       <p className="mt-2">
-        Nothing happens until Penny reads it back and you confirm. Every action leaves a receipt.
+        Penny reads printed English letters on your device. Banking interactions
+        use sample data and do not connect to a bank.
       </p>
-      <p className="mt-2 text-caption text-text-dim">Prototype v1.0</p>
+      <p className="mt-3 text-caption text-text-dim">
+        Voice input uses your browser’s speech recognition service and may send
+        audio to its provider. Always listening is optional and off by default.
+        Speech output uses an installed on-device voice when available.
+      </p>
+      <div className="mt-4 flex flex-col gap-3">
+        <a
+          className="feedback-link"
+          href="https://github.com/joshbeira/Penny/issues/new?template=feedback.yml"
+        >
+          Share feedback
+        </a>
+        <a
+          className="feedback-link"
+          href="https://github.com/joshbeira/Penny/blob/main/docs/PRIVACY.md"
+        >
+          Privacy and data
+        </a>
+        <a className="feedback-link" href="https://github.com/joshbeira/Penny">
+          Source code and user guide
+        </a>
+      </div>
+      <p className="mt-2 text-caption text-text-dim">Public beta · v1.1.0</p>
     </>
   );
 }

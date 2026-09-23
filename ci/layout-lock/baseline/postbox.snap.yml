@@ -1,9 +1,17 @@
+- link "Skip to content":
+  - /url: "#main-content"
 - banner:
   - heading "Post Box" [level=1]
   - button "Quiet Mode"
 - main:
-  - text: Photograph a letter Point at any letter — bank or not.
+  - paragraph: Your post, at your pace
+  - heading "Make the small print speak." [level=2]
+  - paragraph: Photograph a printed English letter, read the recognised text, or listen aloud. No account needed.
+  - text: Photograph a letter Take a photo or choose an image · up to 15 MB
   - button "Photograph a letter"
+  - button "Try a sample letter"
+  - paragraph: Photos stay in this tab. Number masking is imperfect and may hide dates too. Check the text before relying on it.
+  - status "Reading status"
 - navigation:
   - list:
     - listitem:

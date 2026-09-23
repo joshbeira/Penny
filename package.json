@@ -1,23 +1,27 @@
 {
   "name": "penny",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",
-    "test": "node --test src/lib/hash.test.ts src/lib/intents.test.ts src/state/receipts.test.ts",
+    "test": "node --test src/lib/*.test.ts src/state/*.test.ts tests/unit/*.test.ts",
     "voice": "node scripts/generate-voice.mjs",
     "icons": "node scripts/make-icons.mjs",
     "lock:check": "node ci/layout-lock/check.mjs",
     "lock:baseline": "node ci/layout-lock/check.mjs --baseline",
-    "lock:demo-break": "VITE_BREAK_LAYOUT=1 node ci/layout-lock/check.mjs"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26",
+    "react-router-dom": "^7.18.4",
     "tesseract.js": "^5",
     "tone": "^15",
     "zustand": "^5"
@@ -30,10 +34,23 @@
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4",
     "playwright": "^1.49",
-    "sharp": "^0.33",
+    "prettier": "^3.6.2",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "typescript": "^5.6",
     "vite": "^6",
     "vite-plugin-pwa": "^0.21"
+  },
+  "description": "An accessible letter reader with on-device OCR, voice navigation, and verifiable action receipts.",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joshbeira/Penny.git"
+  },
+  "homepage": "https://joshbeira.github.io/Penny/",
+  "bugs": {
+    "url": "https://github.com/joshbeira/Penny/issues"
   }
 }

@@ -2,64 +2,20 @@ import { lineText } from "../data/voiceLines";
 import type { FixedLineId } from "../data/voiceLines";
 import { useSession } from "../state/session";
 import { useSettings } from "../state/settings";
-
-// SPEC 3: unlock, speak(), fixed-line player, sound-dot state. It also owns the
-// live-region text (see `announce` below) because it is the only module both
-// speak() and earcons.ts share.
-
-// ---------------------------------------------------------------------------
-// Tone handle
-// ---------------------------------------------------------------------------
-
-// A *type-only* reference: `typeof import("tone")` is erased at compile time, so
-// nothing pulls tone into the initial bundle.
-//
-// This matters more than it looks. tone's index.js evaluates getContext() at
-// module top level (its deprecated Transport/Destination/Master/Listener/Draw/
-// context exports), and getContext() constructs a real AudioContext. The
-// package does not declare `sideEffects: false`, so Rollup cannot drop those.
-// A static `import * as Tone from "tone"` would therefore build an AudioContext
-// on page load — before the splash tap — breaking SPEC 6.1's "No audio API may
-// be called anywhere before session.unlocked is true". Hence the dynamic
-// import inside unlock(), which is also what code-splits tone out of the entry
-// chunk.
 export type ToneApi = typeof import("tone");
 
 let tone: ToneApi | null = null;
-
-// The one accessor earcons.ts and haptics.ts use.
-//
-// It awaits unlock() rather than assuming it has run, because P1 persists
-// session.unlocked to sessionStorage: after a full page reload inside the same
-// tab the splash is skipped and unlock() never fires, yet the Glance button is
-// right there on Home. Every caller is inside a click or a post-click chain, so
-// Tone.start() still has its gesture. unlock() is idempotent, so this is a
-// no-op once it has run.
-//
-// null means SPEC 6.1's gate is still shut — no audio API may be touched.
 export async function ensureUnlocked(): Promise<ToneApi | null> {
   if (!useSession.getState().unlocked) return null;
   await unlock();
   return tone;
 }
-
-// ---------------------------------------------------------------------------
-// Sound-dot state (SPEC 6.3 step 6, SPEC 4)
-// ---------------------------------------------------------------------------
-
-// A refcount rather than a boolean: SPEC 4 pulses the dot "whenever Penny is
-// speaking or playing an earcon", and those two channels are independent —
-// earcons.ts calls these too, and a Glance can overlap a spoken line.
 let activity = 0;
 const speakingListeners = new Set<() => void>();
 
 function emitSpeaking(): void {
   speakingListeners.forEach((listener) => listener());
 }
-
-// Both also notify the live-region busy flag: audio in flight is a producer
-// that may still announce, so SPEC 15's `data-live-busy` cannot go false while
-// any is running. See the live region section below for why that matters.
 export function beginAudioActivity(): void {
   activity += 1;
   if (activity === 1) {
@@ -86,26 +42,7 @@ export function subscribeSpeaking(listener: () => void): () => void {
     speakingListeners.delete(listener);
   };
 }
-
-// ---------------------------------------------------------------------------
-// Live region (SPEC 15, SPEC 6.3 step 1)
-// ---------------------------------------------------------------------------
-
-// SPEC 7.1 and 7.2 post their completion lines straight here rather than through
-// speak(), which would speak them. `seq` lets LiveRegion.tsx re-announce an
-// identical string — replaying the Glance must not go silent for a screen
-// reader just because the text has not changed.
 export type Announcement = { text: string; seq: number };
-
-// SPEC 15: the live region is a SERIAL QUEUE, not a slot. announce() appends and
-// nothing is ever overwritten; messages render one at a time with a minimum gap
-// between them.
-//
-// Before this, the last writer won. P5 measured the failure: the splash Glance's
-// completion line landed 1043ms after the tap and silently replaced whatever a
-// flow had just posted, and a screen reader announced only the survivor. A burst
-// like SPEC 11.5's read-aloud (six lines at once, in Quiet Mode) lost five of
-// them the same way.
 const MIN_GAP_MS = 900;
 
 let announcement: Announcement = { text: "", seq: 0 };
@@ -113,19 +50,6 @@ const announcementListeners = new Set<() => void>();
 
 let pending: string[] = [];
 let draining = false;
-
-// SPEC 15's `data-live-busy`. It is deliberately the union of two conditions,
-// not just the queue:
-//
-//   1. the queue is draining, and
-//   2. any audio is in flight (the sound-dot refcount above).
-//
-// Condition 2 is what makes the flag a usable wait for SPEC 16. earcons.ts posts
-// its completion line on a timer at the END of the earcon and only then tears
-// down, so audio activity is still up when that line is announced. Without it,
-// a consumer waiting for "false" would be released ~900ms after the greet — and
-// the Glance line would arrive after the snapshot, which is exactly the race
-// P2, P3, P4 and P5 each recorded and this flag exists to end.
 const liveBusyListeners = new Set<() => void>();
 
 function emitLiveBusy(): void {
@@ -153,12 +77,11 @@ async function drain(): Promise<void> {
   emitLiveBusy();
 
   while (pending.length > 0) {
-    announcement = { text: pending.shift() as string, seq: announcement.seq + 1 };
+    announcement = {
+      text: pending.shift() as string,
+      seq: announcement.seq + 1,
+    };
     announcementListeners.forEach((listener) => listener());
-
-    // The gap follows the LAST message too, so anything waiting on
-    // `data-live-busy="false"` is guaranteed the final line has been sitting in
-    // the region long enough to be picked up, not merely written to it.
     await new Promise<void>((resolve) => {
       window.setTimeout(resolve, MIN_GAP_MS);
     });
@@ -178,18 +101,6 @@ export function subscribeAnnouncement(listener: () => void): () => void {
     announcementListeners.delete(listener);
   };
 }
-
-// ---------------------------------------------------------------------------
-// Text cards (SPEC 11.3, SPEC 6.3 step 2)
-// ---------------------------------------------------------------------------
-
-// Quiet Mode replaces speech with cards, so the stack belongs to the gateway
-// that suppresses the speech. It sits here beside the live region for the same
-// reason that does: audio.ts is the non-component module every speaker shares,
-// and SPEC 3's state/ directory has exactly four stores.
-//
-// The array is swapped rather than mutated — TextCard.tsx reads it through
-// useSyncExternalStore, which compares snapshots by identity.
 export type TextCardEntry = { id: number; text: string };
 
 let cards: TextCardEntry[] = [];
@@ -204,8 +115,6 @@ function pushCard(text: string): void {
   cards = [...cards, { id: nextCardId++, text }];
   emitCards();
 }
-
-// SPEC 11.3: "auto-dismiss 6s or on tap". Both routes land here.
 export function dismissCard(id: number): void {
   cards = cards.filter((card) => card.id !== id);
   emitCards();
@@ -221,14 +130,6 @@ export function subscribeCards(listener: () => void): () => void {
     cardListeners.delete(listener);
   };
 }
-
-// ---------------------------------------------------------------------------
-// Unlock (SPEC 6.1)
-// ---------------------------------------------------------------------------
-
-// SPEC 6.3 step 3: "a shared HTMLAudioElement". It is created here so the 30ms
-// silent buffer plays through the very element speak() reuses — that is what
-// actually unlocks media playback for it on Android.
 let element: HTMLAudioElement | null = null;
 
 function audioElement(): HTMLAudioElement {
@@ -238,17 +139,14 @@ function audioElement(): HTMLAudioElement {
   }
   return element;
 }
-
-// 30ms of 16-bit mono PCM silence at 8kHz, as a data URI. Built here rather
-// than shipped as an asset: SPEC 3's tree has no such file, and a data URI
-// needs no object URL to revoke.
 function silentClip(): string {
   const sampleRate = 8000;
   const samples = Math.round(sampleRate * 0.03);
   const bytes = new Uint8Array(44 + samples * 2);
   const view = new DataView(bytes.buffer);
   const ascii = (offset: number, text: string) => {
-    for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+    for (let i = 0; i < text.length; i += 1)
+      view.setUint8(offset + i, text.charCodeAt(i));
   };
 
   ascii(0, "RIFF");
@@ -264,7 +162,6 @@ function silentClip(): string {
   view.setUint16(34, 16, true); // bits per sample
   ascii(36, "data");
   view.setUint32(40, samples * 2, true);
-  // The sample frames stay zero — that is the silence.
 
   let binary = "";
   bytes.forEach((byte) => {
@@ -274,10 +171,6 @@ function silentClip(): string {
 }
 
 let unlocking: Promise<void> | null = null;
-
-// SPEC 6.1's first four steps, in order. Splash.tsx owns the rest of the
-// sequence (unlocked flag, greet, navigate, glance) because those are routing
-// and state, not audio.
 export function unlock(): Promise<void> {
   if (!unlocking) unlocking = runUnlock();
   return unlocking;
@@ -291,70 +184,27 @@ async function runUnlock(): Promise<void> {
   player.src = silentClip();
   try {
     await player.play();
-  } catch {
-    // Nothing to recover: the silent buffer is an Android media-unlock hint,
-    // and every later line still has SPEC 6.3 step 5 behind it.
+  } catch {}
+
+  if ("speechSynthesis" in window) {
+    speechSynthesis.cancel();
+    speechSynthesis.resume();
   }
-
-  speechSynthesis.cancel();
-  speechSynthesis.resume();
-
-  // SPEC 7's master output. It has no assigned slot in SPEC 6.1's list; here is
-  // the first legal moment to touch Tone and the last one before any earcon.
   tone.getDestination().volume.value = -8;
 }
 
-// ---------------------------------------------------------------------------
-// speak() — the single speech gateway (SPEC 6.3)
-// ---------------------------------------------------------------------------
-
 export type SpeakInput = { id?: FixedLineId; text?: string };
 
-const ttsCache = new Map<string, string>();
-
-// SPEC 6.3: "one line at a time; sequential calls await the previous line's
-// end." Failures are absorbed into the chain so one bad line cannot wedge it.
 let queue: Promise<void> = Promise.resolve();
-
-// SPEC 11.7's `stop_speaking` barge-in. A generation counter rather than a
-// cleared array: the chain IS the queue, so the way to empty it is to make
-// every line already sitting in it a no-op. Anything queued before the stop
-// captured the old generation and skips; anything spoken after captures the new
-// one and plays. The chain's ordering guarantee survives, which resetting
-// `queue` to a fresh resolved promise would have broken — a new line could then
-// start while the aborted one was still settling.
 let generation = 0;
-
-// The in-flight playback's aborter, registered by play(). It RESOLVES rather
-// than rejects: run()'s catch is SPEC 6.3 step 5's speechSynthesis fallback, and
-// a stop that fell into it would immediately start speaking the line it had just
-// been told to stop.
 let cancelPlayback: (() => void) | null = null;
-
-// SPEC 11.7: "Halts current playback immediately (barge-in): stops the audio
-// element, speechSynthesis.cancel(), and any Tone playback." Tone is the caller's
-// job — earcons.ts exports stopEarcons() for it — which keeps this module free of
-// an import cycle with the module that already imports it.
-//
-// The aria-live queue is deliberately NOT cleared. SPEC 15 makes it a serial
-// queue that is never overwritten, and SPEC 11.7 scopes the clear to "the speech
-// queue in audio.ts": silencing the speakers must not silence a screen reader.
 export function stopSpeaking(): void {
   generation += 1;
   cancelPlayback?.();
   cancelPlayback = null;
-  speechSynthesis.cancel();
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
 }
-
-// SPEC 11.7's `repeat`: "Replays the last spoken string — store `lastSpoken` in
-// audio.ts". The whole SpeakInput is stored rather than the bare string so a
-// fixed line replays from its committed MP3 (SPEC 6.2) instead of being
-// re-synthesised in a different voice; the string is what the mirror and the
-// card use either way.
 let lastSpoken: SpeakInput | null = null;
-
-// Returns false when Penny has not said anything yet, so the caller can offer
-// something rather than answer a question with silence.
 export function repeatLast(): boolean {
   if (!lastSpoken) return false;
   void speak(lastSpoken);
@@ -363,27 +213,15 @@ export function repeatLast(): boolean {
 
 export function speak(input: SpeakInput): Promise<void> {
   const era = generation;
-  const next = queue.then(() => (era === generation ? run(input) : undefined)).catch(() => undefined);
+  const next = queue
+    .then(() => (era === generation ? run(input) : undefined))
+    .catch(() => undefined);
   queue = next;
   return next;
 }
-
-// SPEC 11.3: "Toggling ON plays `quiet_on` as the final spoken line."
-//
-// Step 2 above suppresses unconditionally, so the only ordering that leaves
-// that line audible is to speak it BEFORE the flag goes up — which is exactly
-// what "final" means. The visible cost is that the toggle's pressed state lags
-// the tap by the length of the line; the alternative would be an escape hatch
-// in the gateway, and SPEC 6.3 step 2 admits none.
-//
-// It lives here rather than in the two components that call it (SPEC 10's
-// Header toggle and SPEC 10's Settings row are the same setting) so there is
-// one implementation, and here rather than in state/settings.ts so no import
-// cycle forms with this module.
 let entering = false;
 
 export async function enterQuietMode(): Promise<void> {
-  // Without this, a second tap during the ~2s line queues a second `quiet_on`.
   if (entering) return;
   entering = true;
   try {
@@ -395,79 +233,28 @@ export async function enterQuietMode(): Promise<void> {
 }
 
 async function run(input: SpeakInput): Promise<void> {
-  // When both are given (SPEC 11.1 step 8's read-back), `text` is the exact
-  // on-screen wording and the id is the recording of it, so the mirror takes
-  // the text: a screen reader should hear "42 Lavender Grove", not "forty two".
   const text = input.text ?? (input.id ? lineText(input.id) : "");
   if (!text) return;
-
-  // SPEC 11.7's `repeat` reads this. Recorded here rather than in speak() so it
-  // is the line Penny actually delivered, and BEFORE the Quiet Mode branch so
-  // "say that again" works on a text card too.
   lastSpoken = input;
-
-  // SPEC 6.3 step 1 — ALWAYS, in every mode. Screen-reader parity.
   announce(text);
-
-  // SPEC 6.3 step 2: "render a TextCard with the text; play no speech; return."
-  // The return is literal — nothing awaits the card — which is why SPEC 11.3
-  // says cards *stack*: a burst like SPEC 11.5's read-aloud puts one up per
-  // line, all at once, each running its own 6s timer.
-  //
-  // Earcons and haptic fallback blips are exempt because they never come
-  // through here (SPEC 11.3's matrix keeps them audible in Quiet Mode); they
-  // route through earcons.ts and haptics.ts.
   if (useSettings.getState().quietMode) {
     pushCard(text);
     return;
   }
-
-  // SPEC 6.1 bars any audio API before the splash tap. speak() is only
-  // reachable afterwards, but the invariant is load-bearing enough to enforce.
   if (!useSession.getState().unlocked) return;
-
-  // A stop landing during the /api/tts round trip must not be undone by the
-  // response arriving afterwards, so the generation is re-checked either side of
-  // every await that can outlive it.
   const era = generation;
 
   beginAudioActivity();
   try {
-    // SPEC 6.3 step 3, then step 4.
-    const url = input.id ? `/audio/${input.id}.mp3` : await ttsUrl(text);
-    if (era !== generation) return;
-    await play(url);
+    if (input.id)
+      await play(`${import.meta.env.BASE_URL}audio/${input.id}.mp3`);
+    else await synthesise(text);
   } catch {
     if (era !== generation) return;
-    // SPEC 6.3 step 5 — ANY failure: missing file, network, non-200, bad body.
-    // With no fixed-line MP3s recorded and /api/tts answering 502 without an
-    // ELEVENLABS_API_KEY, this is the live path for every line today.
     await synthesise(text);
   } finally {
-    // Reached on every path including the barge-in, so SPEC 6.3 step 6's
-    // refcount — and with it SPEC 15's data-live-busy — can never stick high.
     endAudioActivity();
   }
-}
-
-async function ttsUrl(text: string): Promise<string> {
-  const cached = ttsCache.get(text);
-  if (cached) return cached;
-
-  const response = await fetch("/api/tts", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text }),
-  });
-  if (!response.ok) throw new Error(`/api/tts responded ${response.status}`);
-
-  const blob = await response.blob();
-  if (!blob.type.startsWith("audio/")) throw new Error(`/api/tts returned ${blob.type}`);
-
-  // SPEC 6.3 step 4: cache blobs in-memory keyed by text.
-  const url = URL.createObjectURL(blob);
-  ttsCache.set(text, url);
-  return url;
 }
 
 function play(url: string): Promise<void> {
@@ -487,10 +274,6 @@ function play(url: string): Promise<void> {
       cleanup();
       reject(new Error(`Playback failed: ${url}`));
     };
-    // SPEC 11.7's barge-in. pause() is what stops the sound; resolving rather
-    // than rejecting is what keeps run()'s catch — the speechSynthesis fallback
-    // — from speaking the line we were just told to stop. The later AbortError
-    // from the pending play() lands on an already-settled promise.
     const abort = () => {
       cleanup();
       player.pause();
@@ -504,21 +287,35 @@ function play(url: string): Promise<void> {
     player.play().catch(onError);
   });
 }
-
-// SPEC 6.3 step 5. Resolves on `error` as well as `end` so the queue keeps
-// moving; getVoices() populates asynchronously in Chrome, so it is read at call
-// time and an empty list is fine — lang alone still selects en-GB.
 function synthesise(text: string): Promise<void> {
+  if (!("speechSynthesis" in window)) return Promise.resolve();
   return new Promise((resolve) => {
+    const finish = () => {
+      if (cancelPlayback === finish) cancelPlayback = null;
+      resolve();
+    };
+    cancelPlayback = finish;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-GB";
     utterance.rate = 1.0;
 
-    const voice = speechSynthesis.getVoices().find((candidate) => candidate.lang.startsWith("en-GB"));
-    if (voice) utterance.voice = voice;
+    const voice = speechSynthesis
+      .getVoices()
+      .find(
+        (candidate) =>
+          candidate.localService && candidate.lang.startsWith("en"),
+      );
+    if (!voice) {
+      announce(
+        "An on-device voice is unavailable. You can read or download the text.",
+      );
+      finish();
+      return;
+    }
+    utterance.voice = voice;
 
-    utterance.addEventListener("end", () => resolve());
-    utterance.addEventListener("error", () => resolve());
+    utterance.addEventListener("end", finish);
+    utterance.addEventListener("error", finish);
     speechSynthesis.speak(utterance);
   });
 }
