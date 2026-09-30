@@ -311,6 +311,64 @@ body {
   overflow-wrap: anywhere;
   line-height: 1.75;
 }
+.reader-button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--amber);
+  border-radius: 999px;
+  padding: 10px 20px;
+  color: var(--amber);
+}
+.reader-button:disabled {
+  opacity: 0.5;
+}
+.text-field,
+.reading-preferences select {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--text-dim);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+.field-label {
+  display: grid;
+  gap: 8px;
+}
+.reading-preferences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0 20px;
+}
+.reading-preferences label {
+  flex: 1 1 180px;
+  display: grid;
+  gap: 8px;
+}
+.reading-preferences legend {
+  margin-bottom: 12px;
+}
+.letter-excerpt {
+  margin: 18px 0;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.product-card {
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  border-radius: 22px;
+  padding: 24px;
+}
 .skip-link {
   position: fixed;
   left: 12px;

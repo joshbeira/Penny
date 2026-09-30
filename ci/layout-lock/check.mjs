@@ -16,6 +16,7 @@ const ORIGIN = `http://localhost:${PORT}`;
 const ROUTES = [
   { path: "/", name: "home" },
   { path: "/postbox", name: "postbox" },
+  { path: "/library", name: "library" },
   { path: "/receipts", name: "receipts" },
   { path: "/settings", name: "settings" },
   { path: "/journey", name: "journey" },

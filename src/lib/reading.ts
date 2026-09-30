@@ -15,8 +15,10 @@ export function redactText(text: string): string {
     .replace(/\b(?:\d[ -]?){4,}\b/g, "[hidden]");
 }
 
-export function localReading(text: string): Reading {
-  const clean = redactText(text).trim();
+export function localReading(text: string, maskNumbers = true): Reading {
+  if (text.length > 16000)
+    throw new Error("Read one page at a time, up to 16,000 characters.");
+  const clean = (maskNumbers ? redactText(text) : text).trim();
   if (!clean)
     throw new Error(
       "No readable text found. Try a brighter, sharper photograph.",

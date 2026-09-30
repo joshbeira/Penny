@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { enterQuietMode } from "../lib/audio";
 import { useSettings } from "../state/settings";
+import ReadingPreferences from "../components/ReadingPreferences";
 function Toggle({
   label,
   checked,
@@ -49,6 +50,7 @@ export default function Settings() {
 
   return (
     <>
+      <ReadingPreferences />
       <ul>
         <Toggle
           label="Quiet Mode"
@@ -74,6 +76,9 @@ export default function Settings() {
 
       <Link className="feedback-link mt-4" to="/sandbox">
         Explore the banking sandbox
+      </Link>
+      <Link className="feedback-link mt-4" to="/receipts">
+        Inspect practice receipts
       </Link>
       <Link
         to="/journey"
@@ -109,7 +114,13 @@ export default function Settings() {
           Source code and user guide
         </a>
       </div>
-      <p className="mt-2 text-caption text-text-dim">Public beta · v1.1.0</p>
+      <a
+        className="feedback-link mt-4"
+        href="https://github.com/joshbeira/Penny/releases/latest"
+      >
+        Get Penny for Android
+      </a>
+      <p className="mt-2 text-caption text-text-dim">Public beta · v2.0.0</p>
     </>
   );
 }

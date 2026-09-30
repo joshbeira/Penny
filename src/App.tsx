@@ -13,6 +13,7 @@ import PostBox from "./screens/PostBox";
 import Receipts from "./screens/Receipts";
 import Settings from "./screens/Settings";
 import Journey from "./screens/Journey";
+import Library from "./screens/Library";
 import {
   listen,
   runIntent,
@@ -25,6 +26,7 @@ const TITLES: Record<string, string> = {
   "/": "Home",
   "/postbox": "Post Box",
   "/receipts": "Receipts",
+  "/library": "Library",
   "/settings": "Settings",
   "/journey": "One customer. Three years.",
 };
@@ -113,6 +115,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/postbox" element={<PostBox />} />
               <Route path="/receipts" element={<Receipts />} />
+              <Route path="/library" element={<Library />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/journey" element={<Journey />} />
 

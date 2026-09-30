@@ -168,7 +168,43 @@ export default function Home({ era }: { era?: Era }) {
             <span>No account</span>
             <span>On-device OCR</span>
             <span>Voice + text</span>
+            <span>Works offline</span>
           </div>
+          <div className="product-grid">
+            <section className="product-card">
+              <p className="eyebrow">Pick up where you left off</p>
+              <h3 className="mt-3 text-card">A home for your letters.</h3>
+              <p className="mt-3 text-text-dim">
+                Save reviewed text, find it by a word, and keep favourites
+                close. Everything stays in this browser.
+              </p>
+              <Link className="feedback-link mt-3" to="/library">
+                Open your library
+              </Link>
+            </section>
+            <section className="product-card">
+              <p className="eyebrow">Penny for Android</p>
+              <h3 className="mt-3 text-card">Made for your pocket.</h3>
+              <p className="mt-3 text-text-dim">
+                A native app with offline reading, device speech and your
+                private library. Android 8 or later.
+              </p>
+              <a
+                className="feedback-link mt-3"
+                href="https://github.com/joshbeira/Penny/releases/latest"
+              >
+                Get the Android app
+              </a>
+            </section>
+          </div>
+          <section className="product-card">
+            <h3 className="text-card">From small print to clear words.</h3>
+            <ol className="mt-3 space-y-2 text-text-dim list-decimal pl-5">
+              <li>Photograph a letter or paste the text.</li>
+              <li>Check the words and choose a comfortable size and speed.</li>
+              <li>Listen, save it for later, or download a copy.</li>
+            </ol>
+          </section>
           <a
             className="feedback-link"
             href="https://github.com/joshbeira/Penny/issues/new?template=feedback.yml"
@@ -180,6 +216,9 @@ export default function Home({ era }: { era?: Era }) {
             The account below is a sandbox with sample data. Payments and card
             orders are simulations.
           </p>
+          <Link className="feedback-link" to="/receipts">
+            Inspect practice receipts
+          </Link>
         </section>
       )}
       {balance}

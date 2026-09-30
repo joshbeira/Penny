@@ -8,3 +8,8 @@ package-lock.json
 ci/layout-lock/baseline
 playwright-report
 test-results
+android/.gradle
+android/.kotlin
+android/**/build
+android/local.properties
+android/gradlew*

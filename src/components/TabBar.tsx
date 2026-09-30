@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 const TABS = [
   { to: "/", label: "Home" },
   { to: "/postbox", label: "Post Box" },
-  { to: "/receipts", label: "Receipts" },
+  { to: "/library", label: "Library" },
   { to: "/settings", label: "Settings" },
 ] as const;
 export default function TabBar() {

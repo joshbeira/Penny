@@ -93,7 +93,14 @@ test("invalid photos recover without a substitute letter", async ({ page }) => {
 test("main routes have no serious accessibility violations or horizontal overflow", async ({
   page,
 }) => {
-  for (const route of ["/", "/postbox", "/receipts", "/settings", "/journey"]) {
+  for (const route of [
+    "/",
+    "/postbox",
+    "/library",
+    "/receipts",
+    "/settings",
+    "/journey",
+  ]) {
     await page.goto(route);
     await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
     const result = await new AxeBuilder({ page }).analyze();
@@ -108,6 +115,78 @@ test("main routes have no serious accessibility violations or horizontal overflo
       ),
     ).toBe(true);
   }
+});
+
+test("reviewed text can be saved, found, reopened offline and deleted", async ({
+  page,
+  context,
+}) => {
+  await page.getByRole("button", { name: "Try a sample letter" }).click();
+  await page.getByRole("button", { name: "Correct text", exact: true }).click();
+  await page
+    .getByLabel("Correct the recognised text")
+    .fill("Oak Street Library\nCollect by 2026-10-05.");
+  await page.getByRole("button", { name: "Apply corrections" }).click();
+  await page.getByLabel("Text size", { exact: true }).selectOption("28");
+  await expect(page.locator(".letter-text")).toHaveCSS("font-size", "28px");
+  await page
+    .getByRole("button", { name: "Save to library", exact: true })
+    .click();
+  await page
+    .getByLabel("Letter title", { exact: true })
+    .fill("Library collection");
+  await page
+    .getByRole("button", { name: "Save letter on this device" })
+    .click();
+  await expect(
+    page.getByRole("status", { name: "Reading status" }),
+  ).toContainText("Saved to your device");
+  await page.getByRole("link", { name: "Open your library" }).click();
+  await page.getByLabel("Search letters").fill("2026-10-05");
+  await expect(
+    page.getByRole("heading", { name: "Library collection" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add favourite" }).click();
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  await context.setOffline(true);
+  await page.reload();
+  await page.getByRole("button", { name: "Open letter", exact: true }).click();
+  await expect(page.locator(".letter-text")).toContainText("2026-10-05");
+  await page.getByRole("link", { name: "Open your library" }).click();
+  await page
+    .getByRole("button", { name: "Delete letter", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirm deletion" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your next letter belongs here." }),
+  ).toBeVisible();
+  await context.setOffline(false);
+});
+
+test("storage failure leaves reviewed text available and does not claim a save", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Try a sample letter" }).click();
+  await page.evaluate(() => {
+    Storage.prototype.setItem = () => {
+      throw new DOMException("Full", "QuotaExceededError");
+    };
+  });
+  await page
+    .getByRole("button", { name: "Save to library", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Save letter on this device" })
+    .click();
+  await expect(
+    page.getByRole("status", { name: "Reading status" }),
+  ).toContainText("could not save");
+  await expect(page.locator(".letter-text")).toContainText(
+    "Oak Street Library",
+  );
 });
 
 test("installed app can open its reader offline", async ({ page, context }) => {

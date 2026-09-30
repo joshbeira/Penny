@@ -288,34 +288,79 @@ function play(url: string): Promise<void> {
   });
 }
 function synthesise(text: string): Promise<void> {
-  if (!("speechSynthesis" in window)) return Promise.resolve();
+  if (!("speechSynthesis" in window)) {
+    announce(
+      "Speech is unavailable in this browser. You can read or download the text.",
+    );
+    return Promise.resolve();
+  }
   return new Promise((resolve) => {
+    let finished = false;
+    let voiceTimer = 0;
+    let speechTimer = 0;
     const finish = () => {
+      finished = true;
+      clearTimeout(voiceTimer);
+      clearTimeout(speechTimer);
+      speechSynthesis.removeEventListener("voiceschanged", start);
       if (cancelPlayback === finish) cancelPlayback = null;
       resolve();
     };
     cancelPlayback = finish;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-GB";
-    utterance.rate = 1.0;
-
-    const voice = speechSynthesis
-      .getVoices()
-      .find(
-        (candidate) =>
-          candidate.localService && candidate.lang.startsWith("en"),
-      );
-    if (!voice) {
-      announce(
-        "An on-device voice is unavailable. You can read or download the text.",
-      );
-      finish();
-      return;
+    let started = false;
+    function start() {
+      if (finished || started) return;
+      const voice = speechSynthesis
+        .getVoices()
+        .find(
+          (candidate) =>
+            candidate.localService && candidate.lang.startsWith("en"),
+        );
+      if (!voice) return;
+      started = true;
+      clearTimeout(voiceTimer);
+      speechSynthesis.removeEventListener("voiceschanged", start);
+      const chunks = text.match(/[^\n.!?]{1,200}(?:[.!?]+|\s|$)|.{1,200}/g) ?? [
+        text,
+      ];
+      let index = 0;
+      const next = () => {
+        clearTimeout(speechTimer);
+        if (finished) return;
+        if (index >= chunks.length) {
+          finish();
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(chunks[index++]);
+        utterance.voice = voice!;
+        utterance.lang = voice!.lang;
+        utterance.rate = useSettings.getState().speechRate;
+        utterance.onend = next;
+        utterance.onerror = () => {
+          if (finished) return;
+          announce(
+            "Speech stopped unexpectedly. You can try again or download the text.",
+          );
+          finish();
+        };
+        speechTimer = window.setTimeout(() => {
+          finish();
+          speechSynthesis.cancel();
+          announce("Speech timed out. Try reading again.");
+        }, 60_000);
+        speechSynthesis.speak(utterance);
+      };
+      next();
     }
-    utterance.voice = voice;
-
-    utterance.addEventListener("end", finish);
-    utterance.addEventListener("error", finish);
-    speechSynthesis.speak(utterance);
+    speechSynthesis.addEventListener("voiceschanged", start);
+    voiceTimer = window.setTimeout(() => {
+      if (!started) {
+        announce(
+          "An on-device voice is unavailable. You can read or download the text.",
+        );
+        finish();
+      }
+    }, 2000);
+    start();
   });
 }

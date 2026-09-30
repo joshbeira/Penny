@@ -5,6 +5,10 @@ import { maskImage } from "../lib/ocrMask";
 import { localReading, parseReading } from "../lib/reading";
 import type { Reading } from "../lib/reading";
 import { downloadText } from "../lib/download";
+import { Link, useSearchParams } from "react-router-dom";
+import { useLibrary } from "../state/library";
+import { useSettings } from "../state/settings";
+import ReadingPreferences from "../components/ReadingPreferences";
 
 type Mode = "summary" | "exact" | "explain";
 let pickMode: ((mode: Mode) => void) | null = null;
@@ -19,14 +23,27 @@ const SAMPLE =
   "Oak Street Library\nDear reader,\nThe books you reserved are ready to collect. Please bring your library card to the front desk by Friday. We are open from nine in the morning until six in the evening.\nThank you,\nThe library team";
 type Result = {
   letter: Reading;
-  source: "device" | "sample" | "cloud";
+  source: "device" | "sample" | "cloud" | "saved" | "reviewed";
   preview?: string;
   maskedCount?: number;
 };
 
 export default function PostBox() {
+  const [params] = useSearchParams();
+  const textSize = useSettings((state) => state.textSize);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<Result | null>(() => {
+    const saved = useLibrary
+      .getState()
+      .letters.find((letter) => letter.id === params.get("letter"));
+    return saved
+      ? { letter: localReading(saved.text, false), source: "saved" }
+      : null;
+  });
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [title, setTitle] = useState("");
   const [mode, setMode] = useState<Mode>("exact");
   const [message, setMessage] = useState("");
   const [share, setShare] = useState(false);
@@ -51,6 +68,23 @@ export default function PostBox() {
     setMessage("");
     setShare(false);
     setMode("exact");
+    setEditing(false);
+    setSaveOpen(false);
+    setDraft("");
+  }
+  function useText(value: string) {
+    try {
+      const letter = localReading(value, false);
+      clear();
+      setResult({ letter, source: "reviewed" });
+      setMessage(
+        "Reviewed text ready. Saving or sharing will include the text exactly as shown.",
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not read this text.",
+      );
+    }
   }
   async function onFile(file: File) {
     if (lock.current) return;
@@ -196,6 +230,33 @@ export default function PostBox() {
       <button className={BUTTON} disabled={busy} onClick={sample}>
         Try a sample letter
       </button>
+      {!result && (
+        <details>
+          <summary className="feedback-link">Paste or type a letter</summary>
+          <label className="field-label">
+            Letter text
+            <textarea
+              className="text-field"
+              rows={6}
+              maxLength={16000}
+              value={draft}
+              disabled={busy}
+              onChange={(event) => setDraft(event.target.value)}
+            />
+          </label>
+          <p className="my-3 text-caption text-text-dim">
+            Pasted text is kept as entered. Review personal details before
+            sharing.
+          </p>
+          <button
+            className={BUTTON}
+            disabled={busy || !draft.trim()}
+            onClick={() => useText(draft)}
+          >
+            Use this text
+          </button>
+        </details>
+      )}
       <p className="text-caption text-text-dim">
         Photos stay in this tab. Number masking is imperfect and may hide dates
         too. Check the text before relying on it.
@@ -210,7 +271,11 @@ export default function PostBox() {
               ? "Sample letter"
               : result.source === "cloud"
                 ? "AI-assisted reading"
-                : "Read on your device"}
+                : result.source === "saved"
+                  ? "Saved on this device"
+                  : result.source === "reviewed"
+                    ? "Reviewed text"
+                    : "Read on your device"}
           </p>
           <h2 className="text-card">{result.letter.sender}</h2>
           {result.preview && (
@@ -250,7 +315,39 @@ export default function PostBox() {
               ))}
             </div>
           )}
-          <p className="letter-text">{text}</p>
+          <ReadingPreferences />
+          <p className="letter-text" style={{ fontSize: `${textSize}px` }}>
+            {text}
+          </p>
+          {editing && (
+            <div className="reader-stack mb-5">
+              <label className="field-label">
+                Correct the recognised text
+                <textarea
+                  className="text-field"
+                  rows={8}
+                  maxLength={16000}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  style={{ fontSize: `${textSize}px` }}
+                />
+              </label>
+              <p className="text-caption text-text-dim">
+                Changes replace this reading and remove any previous AI summary.
+                Saved copies remain unchanged.
+              </p>
+              <button
+                className={BUTTON}
+                disabled={!draft.trim()}
+                onClick={() => useText(draft)}
+              >
+                Apply corrections
+              </button>
+              <button className={BUTTON} onClick={() => setEditing(false)}>
+                Cancel editing
+              </button>
+            </div>
+          )}
           {result.letter.required_action === "scam_alert" && (
             <p className="text-danger">
               Possible scam indicators. Penny has not reported this letter or
@@ -273,7 +370,77 @@ export default function PostBox() {
             <button className={BUTTON} disabled={busy} onClick={clear}>
               Clear letter
             </button>
+            <button
+              className={BUTTON}
+              disabled={busy}
+              onClick={() => {
+                stopSpeaking();
+                setDraft(result.letter.exact_text);
+                setEditing(true);
+              }}
+            >
+              Correct text
+            </button>
+            <button
+              className={BUTTON}
+              disabled={busy}
+              onClick={() => {
+                setTitle(result.letter.exact_text.split("\n")[0].slice(0, 100));
+                setSaveOpen(true);
+              }}
+            >
+              Save to library
+            </button>
           </div>
+          {saveOpen && (
+            <form
+              className="reader-stack mt-6"
+              onSubmit={(event) => {
+                event.preventDefault();
+                try {
+                  useLibrary.getState().save(title, result.letter.exact_text);
+                  setSaveOpen(false);
+                  setMessage(
+                    "Saved to your device library. No photo was saved.",
+                  );
+                } catch (error) {
+                  setMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not save this letter.",
+                  );
+                }
+              }}
+            >
+              <label className="field-label">
+                Letter title
+                <input
+                  className="text-field"
+                  maxLength={100}
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+              </label>
+              <p className="text-caption text-text-dim">
+                Save the reviewed text in this browser. Anyone with access to
+                this browser profile can read it. Photos and AI summaries are
+                not saved.
+              </p>
+              <button className={BUTTON} type="submit">
+                Save letter on this device
+              </button>
+              <button
+                className={BUTTON}
+                type="button"
+                onClick={() => setSaveOpen(false)}
+              >
+                Cancel saving
+              </button>
+            </form>
+          )}
+          <Link className="feedback-link mt-4" to="/library">
+            Open your library
+          </Link>
           {result.source !== "cloud" &&
             import.meta.env.VITE_DISABLE_CLOUD_AI !== "true" && (
               <details className="mt-6">
