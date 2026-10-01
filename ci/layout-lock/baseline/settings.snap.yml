@@ -4,6 +4,19 @@
   - heading "Settings" [level=1]
   - button "Quiet Mode"
 - main:
+  - group "Make the reading yours":
+    - text: Make the reading yours Text size
+    - combobox "Text size":
+      - option "Standard"
+      - option "Large" [selected]
+      - option "Extra large"
+      - option "Largest"
+    - text: Reading speed
+    - combobox "Reading speed":
+      - option "Slower · 0.6×"
+      - option "Gentle · 0.8×"
+      - option "Normal · 1×" [selected]
+      - option "Faster · 1.2×"
   - list:
     - listitem:
       - button "Quiet Mode"
@@ -15,6 +28,8 @@
       - button "Demo mode"
   - link "Explore the banking sandbox":
     - /url: /sandbox
+  - link "Inspect practice receipts":
+    - /url: /receipts
   - link "Sight-loss journey demo":
     - /url: /journey
   - heading "About Penny" [level=2]
@@ -26,7 +41,9 @@
     - /url: https://github.com/joshbeira/Penny/blob/main/docs/PRIVACY.md
   - link "Source code and user guide":
     - /url: https://github.com/joshbeira/Penny
-  - paragraph: Public beta · v1.1.0
+  - link "Get Penny for Android":
+    - /url: https://github.com/joshbeira/Penny/releases/tag/v2.0.0
+  - paragraph: Public beta · v2.0.0
 - navigation:
   - list:
     - listitem:
@@ -36,8 +53,8 @@
       - link "Post Box":
         - /url: /postbox
     - listitem:
-      - link "Receipts":
-        - /url: /receipts
+      - link "Library":
+        - /url: /library
     - listitem:
       - link "Settings":
         - /url: /settings

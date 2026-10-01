@@ -9,11 +9,31 @@
   - paragraph: Read everyday letters with your eyes, your ears, or both. Private on-device reading, designed around your pace.
   - link "Read a letter":
     - /url: /postbox
-  - text: No account On-device OCR Voice + text
+  - text: No account On-device OCR Voice + text Works offline
+  - paragraph: Pick up where you left off
+  - heading "A home for your letters." [level=3]
+  - paragraph: Save reviewed text, find it by a word, and keep favourites close. Everything stays in this browser.
+  - link "Open your library":
+    - /url: /library
+  - paragraph: Penny for Android
+  - heading "Made for your pocket." [level=3]
+  - paragraph: A native app with offline reading, device speech and your private library. Android 8 or later.
+  - link "Get the Android app":
+    - /url: https://github.com/joshbeira/Penny/releases/tag/v2.0.0
+  - heading "Keep Penny within reach." [level=3]
+  - paragraph: Add the web app to your home screen. After a completed first online load, the reader and saved letters work offline.
+  - group: Installation help
+  - heading "From small print to clear words." [level=3]
+  - list:
+    - listitem: Photograph a letter or paste the text.
+    - listitem: Check the words and choose a comfortable size and speed.
+    - listitem: Listen, save it for later, or download a copy.
   - link "Help shape Penny — share your experience":
     - /url: https://github.com/joshbeira/Penny/issues/new?template=feedback.yml
   - heading "Explore accessible banking" [level=2]
   - paragraph: The account below is a sandbox with sample data. Payments and card orders are simulations.
+  - link "Inspect practice receipts":
+    - /url: /receipts
   - region "Current account balance":
     - paragraph: Current account
     - paragraph: £1,842.60
@@ -41,8 +61,8 @@
       - link "Post Box":
         - /url: /postbox
     - listitem:
-      - link "Receipts":
-        - /url: /receipts
+      - link "Library":
+        - /url: /library
     - listitem:
       - link "Settings":
         - /url: /settings

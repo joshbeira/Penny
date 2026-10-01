@@ -5,6 +5,16 @@ body:
   - type: markdown
     attributes:
       value: "Thank you for trying Penny. This report is public. Please do not attach personal letters, names, addresses, account details or PINs."
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which Penny did you use?
+      options:
+        - Web app
+        - Android app
+        - Both
+    validations:
+      required: true
   - type: textarea
     id: task
     attributes:
@@ -22,6 +32,15 @@ body:
     id: setup
     attributes:
       label: Device, browser and assistive technology (optional)
+  - type: dropdown
+    id: completed
+    attributes:
+      label: Could you complete your task?
+      options:
+        - Yes, independently
+        - Yes, with help
+        - No
+        - Just exploring
   - type: textarea
     id: return
     attributes:

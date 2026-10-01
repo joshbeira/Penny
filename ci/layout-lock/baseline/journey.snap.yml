@@ -24,8 +24,8 @@
       - link "Post Box":
         - /url: /postbox
     - listitem:
-      - link "Receipts":
-        - /url: /receipts
+      - link "Library":
+        - /url: /library
     - listitem:
       - link "Settings":
         - /url: /settings

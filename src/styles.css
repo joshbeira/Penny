@@ -345,7 +345,7 @@ body {
   gap: 16px;
   margin: 12px 0 20px;
 }
-.reading-preferences label {
+.reading-preferences > div {
   flex: 1 1 180px;
   display: grid;
   gap: 8px;

@@ -10,8 +10,8 @@ export default function ReadingPreferences() {
       <legend className="text-caption text-text-dim">
         Make the reading yours
       </legend>
-      <label htmlFor={`${id}-size`}>
-        Text size
+      <div>
+        <label htmlFor={`${id}-size`}>Text size</label>
         <select
           id={`${id}-size`}
           value={textSize}
@@ -22,9 +22,9 @@ export default function ReadingPreferences() {
           <option value={28}>Extra large</option>
           <option value={34}>Largest</option>
         </select>
-      </label>
-      <label htmlFor={`${id}-speed`}>
-        Reading speed
+      </div>
+      <div>
+        <label htmlFor={`${id}-speed`}>Reading speed</label>
         <select
           id={`${id}-speed`}
           value={speechRate}
@@ -38,7 +38,7 @@ export default function ReadingPreferences() {
           <option value={1}>Normal · 1×</option>
           <option value={1.2}>Faster · 1.2×</option>
         </select>
-      </label>
+      </div>
     </fieldset>
   );
 }

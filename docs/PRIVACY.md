@@ -1,24 +1,26 @@
 # Privacy and data
 
-Last updated: 23 September 2026.
+Last updated: 30 September 2026.
 
-Penny has no application analytics, sign-in, advertising or document database.
+Penny has no application analytics, sign-in or advertising. Both apps have an optional **local** letter library; neither has a hosted document database or cross-device sync.
 
-| Data                           | Where it goes                                               | How long Penny keeps it                                               |
-| ------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------- |
-| Photo                          | Browser memory and a local OCR worker; never Penny's API    | Until the reader is cleared or unmounted                              |
-| Recognised letter              | Browser memory                                              | Until the reader is cleared or unmounted                              |
-| Optional AI text               | Penny's API and Google Gemini, after explicit consent       | No application storage; provider handling is subject to its own terms |
-| Speech output                  | Bundled interface audio or an installed local English voice | Speech state can remain in memory for repeat until the page is closed |
-| Microphone audio               | Browser speech recognition, when activated                  | Controlled by the browser/provider; Penny does not record it          |
-| Settings and practice receipts | Browser local storage                                       | Until deleted or site data is cleared                                 |
-| App/OCR assets                 | Browser cache and service worker                            | Until evicted or site data is cleared                                 |
-| Feedback                       | GitHub, if the user submits it                              | Public under GitHub's retention and account controls                  |
+| Data                  | Web                                                                  | Android                                                                        | Retention                                                                                                                                                                                                |
+| --------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Photo                 | Browser memory and local OCR worker; never Penny’s API               | Local ML Kit; camera output temporarily in app cache                           | Web: until cleared or reader unmounts. Android: camera file removed after processing/cancellation; interrupted files cleaned on a later launch after 24 hours. Existing selected photos are not deleted. |
+| Unsaved letter        | Reader memory                                                        | ViewModel memory                                                               | Web: until reader unmounts. Android: until cleared or process terminates; ordinary rotation preserves it.                                                                                                |
+| Explicitly saved text | Browser local storage                                                | App-private SQLite, excluded from backup/device transfer                       | Until deleted, app/site data cleared, or Android uninstalled. Browser storage can be evicted.                                                                                                            |
+| Speech                | Bundled audio or local English voice                                 | Offline English voice                                                          | Transient. Web repeat state lasts until the page closes. Android stops on background.                                                                                                                    |
+| Voice commands        | Browser recognition may send audio to its provider                   | On-device recognition on supported Android devices after microphone permission | Penny stores no recordings. Platform/provider controls apply.                                                                                                                                            |
+| Optional AI           | Reviewed text sent to Penny’s server and Google Gemini after consent | Not included                                                                   | No Penny application storage; provider handling follows its terms.                                                                                                                                       |
+| Settings / receipts   | Browser storage                                                      | App-private preferences / SQLite                                               | Until deleted or app/site data cleared.                                                                                                                                                                  |
+| Feedback              | GitHub if submitted                                                  | GitHub opened in a browser if submitted                                        | Public under GitHub’s controls.                                                                                                                                                                          |
 
-Letter text is not sent for speech generation. AI sharing sends text, never a photograph. The server does not intentionally log document contents; hosting services may retain technical request metadata. Provider terms and data handling must be reviewed by the operator before enabling AI for public use.
+Android has no internet permission. Links open another app; Share text passes the chosen text to another app under your control. Web hosting and browser providers may process technical request data. Penny’s optional server does not intentionally log document contents.
 
-Number masking is heuristic, not guaranteed redaction. It can miss numbers and does not reliably remove names, addresses, health information or other sensitive content. Review text before sharing it. Penny is not intended for secrets such as PINs or passwords.
+Saving is explicit. Photos and AI summaries are not saved in the web letter library; Android saves only reviewed text. Stored text is not encrypted separately by Penny. Anyone with access to the same unlocked device/browser profile may be able to read it. Both apps support up to 100 letters of 16,000 characters each. Exports and shared copies are outside Penny’s storage and need separate deletion.
 
-**Clear letter** removes the displayed letter and preview. **Delete receipts** removes the receipt store. Clearing browser site data removes persistent settings, receipts and cached app assets. Exports are ordinary downloaded files and must be deleted separately. Closing the page clears remaining in-memory speech state.
+Number masking is a convenience, not anonymisation. It may hide useful dates and miss names, addresses, health information or sensitive numbers. Pasted and corrected text is kept as entered. Review text before saving or sharing. Penny is not intended for secrets such as PINs or passwords.
 
-To report a privacy problem, follow [SECURITY.md](../SECURITY.md) and avoid posting personal information in public issues.
+**Clear letter** clears the reading; it does not delete saved copies. Delete a saved letter in **Library**, or delete the whole library after exporting if needed. Practice receipts have separate deletion controls. Clearing browser site data or Android app data removes persistent app data and cached assets. Uninstalling Android removes its private library.
+
+For privacy reports, follow [SECURITY.md](../SECURITY.md). Do not post personal correspondence in public issues.

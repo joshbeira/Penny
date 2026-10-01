@@ -1,0 +1,81 @@
+name: Android release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate release source
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          grep -F "versionName = \"${TAG#v}\"" android/app/build.gradle.kts
+          test -f "docs/releases/$TAG.md"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build signed release
+        env:
+          PENNY_KEYSTORE_BASE64: ${{ secrets.PENNY_KEYSTORE_BASE64 }}
+          PENNY_KEYSTORE_PASSWORD: ${{ secrets.PENNY_KEYSTORE_PASSWORD }}
+          PENNY_KEY_PASSWORD: ${{ secrets.PENNY_KEY_PASSWORD }}
+          PENNY_KEYSTORE_PATH: ${{ runner.temp }}/penny-release.jks
+        working-directory: android
+        run: |
+          test -n "$PENNY_KEYSTORE_BASE64"
+          printf '%s' "$PENNY_KEYSTORE_BASE64" | base64 --decode > "$PENNY_KEYSTORE_PATH"
+          chmod 600 "$PENNY_KEYSTORE_PATH"
+          ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease :app:bundleRelease
+      - name: Verify and package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir release-assets
+          cp android/app/build/outputs/apk/release/app-release.apk "release-assets/penny-${TAG#v}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "release-assets/penny-${TAG#v}.aab"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "release-assets/penny-${TAG#v}.apk" > release-assets/SIGNING-CERTIFICATE.txt
+          cd release-assets
+          sha256sum *.apk *.aab > SHA256SUMS.txt
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/android-release-smoke.sh
+      - name: Create reviewable draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" release-assets/* --verify-tag --draft --prerelease --title "Penny ${TAG#v} — Android and web" --notes-file "docs/releases/$TAG.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signed-release-evidence
+          path: |
+            release-assets/
+            android/app/build/reports/
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/penny-release.jks"

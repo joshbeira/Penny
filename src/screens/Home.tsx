@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import InstallPenny from "../components/InstallPenny";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ACCOUNT,
@@ -191,12 +192,13 @@ export default function Home({ era }: { era?: Era }) {
               </p>
               <a
                 className="feedback-link mt-3"
-                href="https://github.com/joshbeira/Penny/releases/latest"
+                href="https://github.com/joshbeira/Penny/releases/tag/v2.0.0"
               >
                 Get the Android app
               </a>
             </section>
           </div>
+          <InstallPenny />
           <section className="product-card">
             <h3 className="text-card">From small print to clear words.</h3>
             <ol className="mt-3 space-y-2 text-text-dim list-decimal pl-5">

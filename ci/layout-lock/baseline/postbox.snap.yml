@@ -10,6 +10,7 @@
   - text: Photograph a letter Take a photo or choose an image · up to 15 MB
   - button "Photograph a letter"
   - button "Try a sample letter"
+  - group: Paste or type a letter
   - paragraph: Photos stay in this tab. Number masking is imperfect and may hide dates too. Check the text before relying on it.
   - status "Reading status"
 - navigation:
@@ -21,8 +22,8 @@
       - link "Post Box":
         - /url: /postbox
     - listitem:
-      - link "Receipts":
-        - /url: /receipts
+      - link "Library":
+        - /url: /library
     - listitem:
       - link "Settings":
         - /url: /settings

@@ -2,7 +2,19 @@ name: Android
 on:
   push:
     branches: [main, "codex/**"]
+    paths:
+      [
+        "android/**",
+        ".github/workflows/android.yml",
+        "scripts/android-device-tests.sh",
+      ]
   pull_request:
+    paths:
+      [
+        "android/**",
+        ".github/workflows/android.yml",
+        "scripts/android-device-tests.sh",
+      ]
   workflow_dispatch:
 permissions:
   contents: read

@@ -10,7 +10,7 @@ Preserve these boundaries: local OCR must never silently upload a photo; a faile
 
 ## Accessibility-tree changes
 
-Layout Lock compares the accessibility trees on five routes. Review a failure before changing baselines. For an intentional change, run:
+Layout Lock compares the accessibility trees on six routes. Review a failure before changing baselines. For an intentional change, run:
 
 ```sh
 LOCK_MIGRATION=1 npm run lock:baseline
@@ -27,6 +27,8 @@ Remove-Item Env:LOCK_MIGRATION
 Review the resulting diff and run `npm run lock:check`. A new baseline is not evidence that an accessibility regression is acceptable. Include the reasoning in your pull request.
 
 ## Reports
+
+For Android, use JDK 17 and run `./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug` from `android/`. Run `:app:connectedDebugAndroidTest` on an emulator or phone. Keep the bundled OCR/no-internet boundary, microphone consent, explicit saving and backup exclusions intact. See [TESTING.md](docs/TESTING.md) for device coverage.
 
 Include steps, expected behaviour, actual behaviour, browser and assistive technology where relevant. Never upload personal correspondence. Use [private security reporting](SECURITY.md) for vulnerabilities.
 

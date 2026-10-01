@@ -9,13 +9,27 @@ import android.os.Looper
 class PracticeSounds {
     private val handler = Handler(Looper.getMainLooper())
     private var tones: ToneGenerator? = null
+
     fun playWeek() {
         stop()
-        val player = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 45) }.getOrNull() ?: return
+        val player =
+            runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 45) }.getOrNull() ?: return
         tones = player
-        val notes = listOf(ToneGenerator.TONE_PROP_BEEP, ToneGenerator.TONE_PROP_ACK, ToneGenerator.TONE_PROP_NACK)
-        notes.forEachIndexed { index, tone -> handler.postDelayed({ player.startTone(tone, 220) }, index * 750L) }
+        val notes =
+            listOf(
+                ToneGenerator.TONE_PROP_BEEP,
+                ToneGenerator.TONE_PROP_ACK,
+                ToneGenerator.TONE_PROP_NACK,
+            )
+        notes.forEachIndexed { index, tone ->
+            handler.postDelayed({ player.startTone(tone, 220) }, index * 750L)
+        }
         handler.postDelayed({ stop() }, 2300)
     }
-    fun stop() { handler.removeCallbacksAndMessages(null); tones?.release(); tones = null }
+
+    fun stop() {
+        handler.removeCallbacksAndMessages(null)
+        tones?.release()
+        tones = null
+    }
 }

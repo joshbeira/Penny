@@ -1,12 +1,20 @@
 # Using Penny
 
+This guide covers the web app. See [Android installation and usage](ANDROID.md) for the native app.
+
 ## Read a letter
 
 Open Penny and tap the start screen. Select **Read a letter**, then **Photograph a letter**. Use a sharp, well-lit photo of a printed English page, held flat with the whole page visible. JPEG and PNG are the most reliable formats. Images must be smaller than 15 MB.
 
 The first reading may take longer while the OCR engine loads. Penny displays the recognised text and a preview with detected number regions hidden. Check the result against the original: OCR can misread words, dates and amounts, and number masking can remove useful information.
 
-Use **Read aloud**, **Stop reading**, **Download text** or **Clear letter**. You can practise with **Try a sample letter** before choosing a personal image. Changing screens clears the current letter; downloaded text stays wherever your browser saves it.
+Use **Read aloud**, **Stop reading**, **Download text** or **Clear letter**. Practise with **Try a sample letter** before choosing an image. **Correct text** fixes recognition errors; applying corrections removes any AI summary. **Paste or type a letter** works without a photo. Pasted and corrected text preserves entered numbers, so review it before sharing.
+
+## Save and return
+
+Choose **Save to library**, name the letter, then confirm saving on this device. Only reviewed text is stored, not the photo or AI summary. Library supports search, favourites, reopening, export and deletion. Save before changing screens to keep a reading. Editing a reopened letter creates a new copy when saved.
+
+The library belongs to this browser profile. Anyone using the profile can read it. Clearing browser data can remove it; **Export library** keeps a separate copy. **Clear letter** does not remove exports or saved copies. There is no sync, and simultaneous edits from multiple tabs can overwrite one another.
 
 ## Optional summaries
 
@@ -19,6 +27,7 @@ An unavailable service leaves your original reading in place. A summary may be i
 ## Speech and accessibility
 
 - Text and keyboard navigation work without microphone permission.
+- **Text size** and **Reading speed** are available in the reader and Settings and persist for your next visit.
 - Read-aloud uses an English voice installed on your device. If none is available, install an English voice through your device's speech settings; the text and download controls remain usable.
 - The microphone appears only where the browser supports speech recognition. It may send audio to the browser provider. Commands include “post box”, “home”, “settings”, “stop” and “repeat”.
 - Quiet Mode suppresses Penny's speech and displays text cards. Earcons and haptics may still play.

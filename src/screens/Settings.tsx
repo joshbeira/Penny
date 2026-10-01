@@ -116,7 +116,7 @@ export default function Settings() {
       </div>
       <a
         className="feedback-link mt-4"
-        href="https://github.com/joshbeira/Penny/releases/latest"
+        href="https://github.com/joshbeira/Penny/releases/tag/v2.0.0"
       >
         Get Penny for Android
       </a>

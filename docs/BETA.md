@@ -12,9 +12,9 @@ Offer a short session using a synthetic library letter first. A person can decli
 
 1. Ask how they currently handle printed post and what is difficult.
 2. Ask them to find the sample reader without guidance.
-3. Ask them to read aloud, stop, and download the text.
+3. Ask them to read aloud, stop, correct a word, save the letter and reopen it from the library.
 4. Offer a synthetic paper letter to photograph. Observe framing, waiting and error recovery.
-5. Ask them to explain where their photo went and what the AI consent control does.
+5. Ask where the photo and saved text went. For a configured web server, ask what AI consent does. Compare web and Android when a participant wants to try both.
 6. Ask what would make them use Penny again, and what would stop them.
 
 ## Evidence to collect

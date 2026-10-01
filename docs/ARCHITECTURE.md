@@ -1,6 +1,20 @@
 # Architecture
 
-Penny is a React and TypeScript PWA built with Vite. It has no authentication system, document database or bank integration. Zustand holds session state and persists only settings and practice receipts.
+Penny has a React/TypeScript PWA and a native Kotlin/Jetpack Compose Android app. Neither has authentication, a hosted document database or bank integration. Each keeps its own explicitly saved letter library, settings and practice receipts on the device.
+
+## Native Android
+
+`PennyViewModel` exposes immutable `StateFlow` state. Compose subscribes with lifecycle awareness; storage and image work run on IO dispatchers. `LetterRecognizer` downsamples and corrects orientation before calling the bundled ML Kit Latin model. A 45-second deadline bounds the user-facing operation; resources are released on native task completion even if the caller stops waiting.
+
+`PennyStore` uses app-private SQLite with a versioned schema. Letters require an explicit save, with limits of 100 entries and 16,000 characters per entry. Receipts are inserted in database transactions. A missing migration fails without dropping user data. Backup and device transfer are excluded. Delegated camera output uses a narrowly scoped FileProvider and temporary cache files; no broad storage or camera permission is requested.
+
+`SpeechReader` selects offline English voices and chunks text below the speech limit. Lifecycle stop cancels speech, recognition and sound cues. `VoiceCommands` uses only Android’s on-device recognizer on supported API 31+ devices, with runtime microphone permission and single-tap sessions. It never falls back to cloud recognition. The merged manifest removes internet permission, including transitive declarations.
+
+Banking features use synthetic data. Detailed, overview and listen modes demonstrate alternative presentations; they do not claim to reproduce anyone’s sight.
+
+## Web letter library
+
+`penny.library.v1` holds validated, bounded text records with title, timestamp and favourite flag. A save writes to storage before updating visible state, so quota failures cannot claim success. Corrupt data is preserved for recovery export. Storage events refresh other tabs, but simultaneous writes are not transactional. Photos and AI summaries never enter the library. Corrections and pasted text preserve entered numbers; OCR retains conservative masking.
 
 ## Letter processing
 
@@ -28,7 +42,7 @@ Workbox precaches the application, static voice clips, WebAssembly OCR engine an
 
 ## Validation
 
-Node's test runner exercises contracts, intent matching and hash-chain behaviour. Playwright covers the reader with an actual generated letter image, consent and failure paths, downloads and offline startup. Axe examines core routes. Layout Lock compares five reviewed accessibility snapshots and requires an explicit baseline migration.
+Node tests exercise contracts, intent matching, library validation and hash chains. Playwright covers actual generated-image OCR, consent, failures, library persistence, downloads and offline startup. Axe examines core routes. Layout Lock compares six reviewed accessibility snapshots. Kotlin tests, Android lint and airplane-mode instrumentation cover native recognition, persistence and confirmation.
 
 ## Deliberate trade-offs
 

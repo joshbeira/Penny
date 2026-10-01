@@ -2,54 +2,79 @@
   <img src="public/icon.svg" width="76" height="76" alt="Penny" />
   <h1>Penny</h1>
   <p><strong>Every letter. A little clearer.</strong></p>
-  <p>An accessible letter reader with on-device OCR, voice navigation,<br />and a playground for more inclusive financial interfaces.</p>
+  <p>A private, accessible reading companion for Android and the web.<br />Turn printed letters into words you can read, hear, correct and keep.</p>
   <p>
-    <a href="https://joshbeira.github.io/Penny/">Open Penny</a> ·
+    <a href="https://joshbeira.github.io/Penny/">Open the web app</a> ·
+    <a href="https://github.com/joshbeira/Penny/releases/tag/v2.0.0">Download Android</a> ·
     <a href="docs/USER_GUIDE.md">User guide</a> ·
-    <a href="docs/ARCHITECTURE.md">Architecture</a> ·
     <a href="https://github.com/joshbeira/Penny/issues/new?template=feedback.yml">Give feedback</a>
   </p>
   <p>
-    <a href="https://github.com/joshbeira/Penny/actions/workflows/ci.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/ci.yml/badge.svg" alt="Continuous integration" /></a>
+    <a href="https://github.com/joshbeira/Penny/actions/workflows/ci.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/ci.yml/badge.svg" alt="Web checks" /></a>
+    <a href="https://github.com/joshbeira/Penny/actions/workflows/android.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/android.yml/badge.svg" alt="Android checks" /></a>
+    <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?labelColor=101418" alt="Kotlin and Jetpack Compose" />
     <img src="https://img.shields.io/badge/status-public%20beta-FFB703?labelColor=101418" alt="Public beta" />
-    <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?labelColor=101418" alt="Strict TypeScript" />
   </p>
 </div>
 
-![Penny home and letter reader](docs/assets/product.png)
+![Penny web home and letter reader](docs/assets/product.png)
 
-## Why Penny
+## Small print should not get the final word
 
-A letter should not become a barrier because its type is small or its layout is hard to follow. Penny turns photographs of printed English letters into readable, downloadable text, with speech output and controls designed for keyboard and screen-reader access.
+A collection notice, an appointment letter, an unfamiliar bill. Everyday post should be something you can handle at your own pace. Penny makes printed English letters readable and listenable without an account or photo uploads.
 
-The useful path works without an account or an AI subscription: open Post Box, photograph a letter, and read it on your device. The public GitHub Pages beta uses local processing only. Optional AI summaries are available on configured server deployments and require an explicit choice to share the recognised text.
+The reader is a working utility. The accompanying banking sandbox explores speech, touch, sound and explicit confirmation using synthetic accounts. **Penny is an independent public beta, not a banking service.** It does not connect to banks, move money or order real cards.
 
-**Public beta:** ready for people to try and help improve. Accessibility checks are automated, but usability with assistive technology needs ongoing testing with people. Penny is an independent project, not a banking service. The account, payments and card-order flows are clearly labelled simulations using sample data.
+## Two apps. The same private reading workflow.
 
-## What you can do
+|                                | Web / installable PWA                                                          | Native Android                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| **Photograph → readable text** | Bundled Tesseract worker and English model                                     | Bundled ML Kit Latin model; Kotlin + Jetpack Compose                         |
+| **Read without a connection**  | After the first completed online load                                          | From first launch; no internet permission                                    |
+| **Correct and keep**           | Edit OCR or paste text; explicitly save up to 100 letters                      | Edit or paste text; explicitly save up to 100 letters                        |
+| **Find it again**              | Search, favourites, delete and export a browser-local library                  | Search, favourites, delete and export an app-private SQLite library          |
+| **Read at your pace**          | Four text sizes, speech speed, local device voices, stop and Quiet Mode        | Adjustable text and speech speed, offline device voices, stop and Quiet Mode |
+| **Accessible practice**        | Sonification, voice navigation, haptics, confirmation and receipt verification | Spoken overview, sound cues, haptics, confirmation and receipt verification  |
+| **Voice navigation**           | Browser-dependent recognition; may use an online service                       | On-device recognition on supported Android 12+ devices; tap to listen        |
+| **AI summaries**               | Optional on configured server deployments, with per-letter consent             | Not included; Android reading stays entirely on-device                       |
 
-| Capability                          | How it works                                                                                                                |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **Read your own letters**           | Tesseract OCR runs in a browser worker. Failed recognition shows an error; it never substitutes a sample letter.            |
-| **Listen, read or download**        | Large text, installed on-device voices, stop/repeat controls and plain-text export.                                         |
-| **Choose when to use AI**           | Review recognised text, explicitly consent, then request a summary or explanation through a server-side Gemini integration. |
-| **Use the reader offline**          | The installable PWA caches its OCR engine and English language data after the first completed online load.                  |
-| **Explore accessible interactions** | Voice navigation, Quiet Mode, haptic feedback, transaction sonification and a read-back-before-confirmation flow.           |
-| **Inspect action receipts**         | Sandbox actions create SHA-256 hash-linked receipts with verification, JSON export and deletion.                            |
+Libraries stay on their own device/browser. There is no sync, automatic document upload or application analytics. Exports give you a portable copy. [Read the privacy model](docs/PRIVACY.md).
 
-## Try it in a minute
+## Try Penny in a minute
 
-1. Open [Penny](https://joshbeira.github.io/Penny/) and tap to start.
-2. Choose **Read a letter**, then **Try a sample letter**. No camera or personal document is required.
-3. Try **Read aloud**, **Stop reading** and **Download text**.
-4. Photograph a clear, non-sensitive printed English letter to try the real OCR flow.
-5. [Tell me what worked or got in your way](https://github.com/joshbeira/Penny/issues/new?template=feedback.yml). Please do not attach personal letters.
+1. [Open Penny](https://joshbeira.github.io/Penny/) or [install the Android APK](docs/ANDROID.md).
+2. Choose **Read a letter**, then **Try a sample letter**. No personal document is needed.
+3. Try reading aloud, change the text size, and correct a word.
+4. Save the text to your library. Open it again, search for a phrase, or mark it as a favourite.
+5. Try your own clear photograph of a printed English letter. Check names, dates and amounts against the original.
 
-Read-aloud needs an installed English device voice. Voice input depends on browser support and may use the browser provider's online recognition service. See [the user guide](docs/USER_GUIDE.md) for installation and troubleshooting.
+Use an installed English offline voice for speech. Number masking is heuristic: it can miss personal details and hide useful dates. Android lets you switch it off for new photographs. Web corrections and pasted text preserve what you type.
 
-## Run locally
+## Engineering with clear boundaries
 
-Use **Node.js 22.18+** and npm. No environment variables are needed for local reading.
+- **Local image processing.** Neither app uploads photographs. Android bundles its recognition model and omits internet permission. The web self-hosts its worker, WebAssembly engine and language data.
+- **Explicit persistence.** A reading stays transient until saved. Saved text is bounded, exportable and deletable. Browser storage failures preserve the current reading and show an error instead of claiming a successful save.
+- **Lifecycle-aware Android.** A ViewModel exposes immutable state through StateFlow; blocking work runs off the main thread. Speech stops when the app backgrounds. Camera files are temporary, backups are excluded, and recognition handles image orientation and sizing.
+- **Accessible alternatives.** Speech has visible text equivalents. Large controls, readable contrast, keyboard focus, live announcements, scalable text and Quiet Mode support different ways to interact. Automated checks do not substitute for testing with people.
+- **Inspectable practice actions.** Confirmed sandbox actions produce SHA-256 hash-linked receipts. Android writes in database transactions; the web serialises writes. Verification detects inconsistent edits, not a complete rewrite of local history.
+- **Consent-bound AI.** An optional server validates request and response schemas, bounds input and request duration, and preserves the original transcription. Public GitHub Pages has cloud AI disabled.
+
+```mermaid
+flowchart LR
+  A[Photo / pasted text] --> B{On-device recognition}
+  B --> W[Web: Tesseract worker]
+  B --> K[Android: bundled ML Kit]
+  W --> R[Review and correct]
+  K --> R
+  R --> S[Device speech]
+  R --> E[Export / share]
+  R -->|Explicit save| L[Local letter library]
+  R -->|Web only: explicit consent| C[Optional server AI summary]
+```
+
+## Development
+
+**Web — Node.js 22.18+**
 
 ```sh
 git clone https://github.com/joshbeira/Penny.git
@@ -58,58 +83,46 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. For an installable production build:
+No keys are needed for local reading. Optional AI deployment is described in [DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+**Android — JDK 17, Android SDK 36**
+
+Open `android/` in Android Studio, let Gradle sync, and run on Android 8.0 or later. Or:
 
 ```sh
-npm run build
-npm run preview
+cd android
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:connectedDebugAndroidTest
 ```
 
-Vite serves the frontend only. Optional AI summaries use the Vercel function in `api/read-letter.ts`; see [deployment](docs/DEPLOYMENT.md) for server configuration. The reader stays usable when that endpoint is disabled or unavailable.
+On Windows use `gradlew.bat`. The wrapper pins Gradle and verifies its distribution checksum. [Build, signing and installation details](docs/ANDROID.md).
 
-## Engineering decisions
-
-- **Local processing first.** Images are decoded, resized and recognised in the browser. Photos never reach Penny's API. OCR failure closes the processing path with an actionable error.
-- **Explicit trust boundary.** Cloud calls send only the text the user reviewed, after consent. The API validates input and model output, imposes size limits and timeouts, and preserves the original transcription.
-- **Multimodal accessibility.** Speech, visible text, live announcements, keyboard controls and haptics share the same interaction state. Quiet Mode suppresses spoken output while retaining visible feedback.
-- **Accessibility regression checks.** Playwright compares reviewed accessibility-tree snapshots on five routes. Axe checks for serious and critical violations; browser tests cover the real reader workflow.
-- **Verifiable local state.** Receipt writes are serialised so simultaneous actions cannot fork the hash chain. Verification detects inconsistent edits; it is not a cryptographic proof against a person who can rewrite the entire local store.
-
-```mermaid
-flowchart LR
-  A[Photo on device] --> B[Resize + OCR worker]
-  B --> C[Number masking]
-  C --> D[Readable text]
-  D --> E[Device speech / download]
-  D --> F{Explicit consent}
-  F -->|Optional| G[Vercel API]
-  G --> H[Gemini]
-  H --> I[Validated summary]
-  I --> D
-```
-
-## Project layout
+## Repository map
 
 ```text
-api/                 Optional server-side AI endpoint
-src/
-  components/        Shared controls, dialogs, speech feedback and navigation
-  screens/           Home, Post Box, Receipts, Settings and accessibility preview
-  lib/               OCR, speech, intent matching, validation and hashing
-  state/             Settings, session and receipt stores
-  data/              Explicitly synthetic banking examples
-public/              PWA icons, fixed voice clips and self-hosted OCR assets
-tests/e2e/           Browser journeys, OCR, offline and accessibility tests
-tests/unit/          Server request and response contract tests
-ci/layout-lock/      Reviewed accessibility-tree baselines
-docs/                User guide, architecture, privacy and beta research plan
-.github/             Continuous integration and contribution templates
+android/                    Native Kotlin app and Gradle wrapper
+  app/src/main/             Compose UI, ViewModel, OCR, speech and SQLite storage
+  app/src/test/             Kotlin validation, speech and receipt tests
+  app/src/androidTest/      Device journeys, actual OCR and persistence tests
+src/                        React + TypeScript web app
+  components/               Shared controls, installation and speech feedback
+  screens/                  Reader, library, home, receipts and settings
+  lib/                      OCR, audio, validation and intent matching
+  state/                    Local settings, letter library and receipt stores
+api/                        Optional consent-gated AI endpoint
+public/                     PWA assets and bundled OCR resources
+tests/                      Browser and server contract tests
+ci/layout-lock/             Reviewed accessibility-tree baselines
+docs/                       User guides, architecture, privacy and launch kit
+.github/                    Web + Android CI, releases and feedback templates
 ```
 
-## Quality checks
+## Quality gates
 
 ```sh
 npm run typecheck
+npm run format:check
 npm test
 npm run build
 npx playwright install chromium
@@ -117,18 +130,12 @@ npm run test:e2e
 npm run lock:check
 ```
 
-Tests exercise redaction and response validation, consent handling, failure recovery, receipt tampering and concurrent writes, actual image recognition, offline startup, and key user journeys. CI runs on every push and pull request. These checks support development; they do not establish WCAG conformance or replace human assistive-technology testing.
+Web tests cover actual image recognition, offline startup, saved-letter retrieval, correction, storage failure, AI consent, receipt integrity and accessibility. Android CI builds the app, runs Kotlin tests and lint, then exercises a device emulator with networking disabled. Screenshots and reports are retained as workflow artifacts. See [TESTING.md](docs/TESTING.md) for the human test matrix and practical limits.
 
-## Privacy and limits
+## Built to earn repeat use
 
-Penny has no application analytics, accounts or document database. Photos and recognised letters stay in memory until you clear them or leave the reader. Settings and practice receipts persist in browser storage. Optional AI summaries share text with Google; hosting and browser providers may process technical request data. [Read the data flow and limitations](docs/PRIVACY.md).
+Penny is available to try; adoption and retention have not yet been measured. The next milestone is five consenting usability sessions and a seven-day follow-up. The [beta plan](docs/BETA.md) defines what to measure; the [launch kit](docs/LAUNCH.md) contains an invitation, tester tasks and an evidence log template.
 
-Number masking is heuristic: it can miss sensitive details and hide useful numbers such as dates. English print is supported; handwriting, PDFs, complex layouts and other languages are not supported as reliable inputs. Always check important names, amounts and dates. There is no connection to a bank, no transfer of money, and no automatic scam reporting.
-
-## Build it with users
-
-The next milestone is a small, documented usability study with people who find everyday post difficult to read. [The beta plan](docs/BETA.md) defines tasks, consent, feedback and success measures; [the roadmap](docs/ROADMAP.md) tracks work that follows from that evidence.
-
-Useful contributions include accessibility reports, reproducible OCR failures using synthetic documents, browser compatibility findings and focused fixes. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+Feedback that helps most: what you were trying to do, whether you finished, what got in your way, and whether you returned. Use synthetic examples in public reports. [Share an experience](https://github.com/joshbeira/Penny/issues/new?template=feedback.yml), [report an accessibility barrier](https://github.com/joshbeira/Penny/issues), or [contribute a focused improvement](CONTRIBUTING.md).
 
 Built and maintained by [Josh Beira](https://github.com/joshbeira).
