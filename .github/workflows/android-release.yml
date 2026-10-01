@@ -48,6 +48,7 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk "release-assets/penny-${TAG#v}.apk"
           cp android/app/build/outputs/bundle/release/app-release.aab "release-assets/penny-${TAG#v}.aab"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "release-assets/penny-${TAG#v}.apk" > release-assets/SIGNING-CERTIFICATE.txt
+          "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -P 16 4 "release-assets/penny-${TAG#v}.apk"
           cd release-assets
           sha256sum *.apk *.aab > SHA256SUMS.txt
       - name: Enable emulator acceleration

@@ -169,7 +169,12 @@ fun PennyApp(vm: PennyViewModel = viewModel()) {
         }
     fun download(name: String, text: String) {
         vm.prepareExport(text)
-        exportFile.launch(name)
+        try {
+            exportFile.launch(name)
+        } catch (_: RuntimeException) {
+            vm.consumeExport()
+            vm.message("The file picker could not open. Try Share text instead.")
+        }
     }
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -191,13 +196,13 @@ fun PennyApp(vm: PennyViewModel = viewModel()) {
             } else file?.delete()
         }
     fun takePhoto() {
-        val dir = File(context.cacheDir, "camera").apply { mkdirs() }
-        val file = File.createTempFile("letter-", ".jpg", dir)
-        cameraPath = file.absolutePath
         try {
+            val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+            val file = File.createTempFile("letter-", ".jpg", dir)
+            cameraPath = file.absolutePath
             camera.launch(FileProvider.getUriForFile(context, "${context.packageName}.files", file))
-        } catch (_: RuntimeException) {
-            file.delete()
+        } catch (_: Exception) {
+            cameraPath?.let { File(it).delete() }
             cameraPath = null
             vm.message("The camera could not open. Choose a photo instead.")
         }

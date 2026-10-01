@@ -143,7 +143,8 @@ class PennyAppTest {
     @Test
     fun pendingExportSurvivesRotationAndIsConsumedOnlyOnce() {
         compose.activityRule.scenario.onActivity { activity ->
-            androidx.lifecycle.ViewModelProvider(activity)[PennyViewModel::class.java]
+            androidx.lifecycle
+                .ViewModelProvider(activity)[PennyViewModel::class.java]
                 .prepareExport("Synthetic export contents")
         }
         compose.activityRule.scenario.recreate()
@@ -151,6 +152,38 @@ class PennyAppTest {
             val vm = androidx.lifecycle.ViewModelProvider(activity)[PennyViewModel::class.java]
             assertEquals("Synthetic export contents", vm.consumeExport())
             assertNull(vm.consumeExport())
+        }
+    }
+
+    @Test
+    fun openingSavedLetterCancelsPendingRecognitionAndRemovesCameraFile() {
+        val photo = File(compose.activity.cacheDir, "pending-camera.png")
+        val bitmap = Bitmap.createBitmap(1200, 500, Bitmap.Config.ARGB_8888)
+        Canvas(bitmap).drawColor(Color.WHITE)
+        photo.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        compose.activityRule.scenario.onActivity { activity ->
+            val vm = androidx.lifecycle.ViewModelProvider(activity)[PennyViewModel::class.java]
+            vm.readPhoto(Uri.fromFile(photo), photo)
+            vm.open(
+                io.github.joshbeira.penny.data.SavedLetter(
+                    "test",
+                    "Saved letter",
+                    "Keep this reviewed text.",
+                    "2026-10-01T00:00:00Z",
+                    false,
+                )
+            )
+        }
+        compose.waitUntil(5000) { !photo.exists() }
+        compose.activityRule.scenario.onActivity { activity ->
+            val state =
+                androidx.lifecycle
+                    .ViewModelProvider(activity)[PennyViewModel::class.java]
+                    .state
+                    .value
+            assertEquals("Keep this reviewed text.", state.text)
+            assertFalse(state.busy)
         }
     }
 }

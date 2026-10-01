@@ -40,6 +40,23 @@ try {
     await page.locator(".letter-text").innerText(),
     /Penny reads this letter/,
   );
+  await page.getByRole("button", { name: "Correct text", exact: true }).click();
+  await page
+    .getByLabel("Correct the recognised text")
+    .fill("Release verification letter. Collect by 2026-10-05.");
+  await page.getByRole("button", { name: "Apply corrections" }).click();
+  await page
+    .getByRole("button", { name: "Save to library", exact: true })
+    .click();
+  await page
+    .getByLabel("Letter title", { exact: true })
+    .fill("Release verification");
+  await page
+    .getByRole("button", { name: "Save letter on this device" })
+    .click();
+  await page.getByRole("link", { name: "Open your library" }).click();
+  await page.getByRole("button", { name: "Open letter", exact: true }).click();
+  assert.match(await page.locator(".letter-text").innerText(), /2026-10-05/);
   assert.equal(
     await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth,
@@ -48,7 +65,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "Deployment verified: HTTP 200, navigation, sample, real OCR, static-only UI and mobile layout.",
+    "Deployment verified: HTTP 200, navigation, sample, actual OCR, corrections, saved-library reopening, static-only UI and mobile layout.",
   );
 } finally {
   await browser.close();

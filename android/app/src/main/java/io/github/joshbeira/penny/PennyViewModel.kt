@@ -12,11 +12,15 @@ import io.github.joshbeira.penny.data.SavedLetter
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class PennyState(
@@ -46,6 +50,16 @@ class PennyViewModel(application: Application) : AndroidViewModel(application) {
         )
     val state = mutable.asStateFlow()
     private var pendingExport: String? = null
+    private var recognition: Job? = null
+    private var readingRevision = 0
+    private val storageWrites = Mutex()
+
+    private fun cancelRecognition() {
+        readingRevision += 1
+        recognition?.cancel()
+        recognition = null
+        mutable.update { it.copy(busy = false) }
+    }
 
     fun prepareExport(text: String) {
         pendingExport = text
@@ -72,7 +86,7 @@ class PennyViewModel(application: Application) : AndroidViewModel(application) {
     private fun task(work: suspend () -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                work()
+                storageWrites.withLock { work() }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -88,6 +102,7 @@ class PennyViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun sample() {
+        cancelRecognition()
         mutable.update {
             it.copy(
                 text = LetterText.SAMPLE,
@@ -98,18 +113,21 @@ class PennyViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun edit(text: String) {
+        cancelRecognition()
         mutable.update {
             it.copy(text = text.take(LetterText.MAX_LENGTH), source = "Reviewed text")
         }
     }
 
     fun clear() {
+        cancelRecognition()
         mutable.update {
             it.copy(text = "", source = "", message = "Letter cleared from this reading.")
         }
     }
 
     fun open(letter: SavedLetter) {
+        cancelRecognition()
         mutable.update {
             it.copy(
                 text = letter.text,
@@ -125,30 +143,33 @@ class PennyViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(busy = true, text = "", source = "", message = "Reading on your device…")
         }
         val shouldMask = state.value.maskNumbers
-        viewModelScope.launch {
-            try {
-                val text = LetterRecognizer(getApplication()).read(uri)
-                mutable.update {
-                    it.copy(
-                        text = if (shouldMask) LetterText.mask(text) else text,
-                        source = "Read on your device",
-                        message =
-                            "Reading ready. Check the text against your letter before relying on it.",
+        val revision = ++readingRevision
+        recognition =
+            viewModelScope.launch {
+                try {
+                    val text = LetterRecognizer(getApplication()).read(uri)
+                    if (revision != readingRevision) return@launch
+                    mutable.update {
+                        it.copy(
+                            text = if (shouldMask) LetterText.mask(text) else text,
+                            source = "Read on your device",
+                            message =
+                                "Reading ready. Check the text against your letter before relying on it.",
+                        )
+                    }
+                } catch (_: TimeoutCancellationException) {
+                    message("Reading timed out. Try a clearer photograph or paste the text.")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    message(
+                        "Could not read this photo. Use good light, keep the page flat, and try again. You can also paste text."
                     )
+                } finally {
+                    withContext(NonCancellable + Dispatchers.IO) { ownedCameraFile?.delete() }
+                    if (revision == readingRevision) mutable.update { it.copy(busy = false) }
                 }
-            } catch (_: TimeoutCancellationException) {
-                message("Reading timed out. Try a clearer photograph or paste the text.")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                message(
-                    "Could not read this photo. Use good light, keep the page flat, and try again. You can also paste text."
-                )
-            } finally {
-                withContext(Dispatchers.IO) { ownedCameraFile?.delete() }
-                mutable.update { it.copy(busy = false) }
             }
-        }
     }
 
     fun save(title: String, text: String) {
