@@ -40,6 +40,8 @@ The reader is a working utility. The accompanying banking sandbox explores speec
 
 Libraries stay on their own device/browser. There is no sync, automatic document upload or application analytics. Exports give you a portable copy. [Read the privacy model](docs/PRIVACY.md).
 
+![Penny Android home, letter reader and saved-letter library in airplane mode](docs/assets/android.png)
+
 ## Try Penny in a minute
 
 1. [Open Penny](https://joshbeira.github.io/Penny/) or [install the Android APK](docs/ANDROID.md).

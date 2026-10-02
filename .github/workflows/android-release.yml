@@ -69,7 +69,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" release-assets/* --verify-tag --draft --prerelease --title "Penny ${TAG#v} — Android and web" --notes-file "docs/releases/$TAG.md"
+          gh release create "$TAG" "release-assets/penny-${TAG#v}.apk" "release-assets/penny-${TAG#v}.aab" release-assets/SHA256SUMS.txt release-assets/SIGNING-CERTIFICATE.txt --verify-tag --draft --prerelease --title "Penny ${TAG#v} — Android and web" --notes-file "docs/releases/$TAG.md"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
