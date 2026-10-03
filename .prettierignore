@@ -13,3 +13,7 @@ android/.kotlin
 android/**/build
 android/local.properties
 android/gradlew*
+ios/Penny.xcodeproj
+ios/build
+ios-evidence
+android-evidence

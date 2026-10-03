@@ -1,0 +1,45 @@
+name: Penny
+options:
+  bundleIdPrefix: io.github.joshbeira
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "2.1.0"
+    CURRENT_PROJECT_VERSION: 20100
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Penny:
+    type: application
+    platform: iOS
+    sources: [Penny]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.joshbeira.penny
+        INFOPLIST_FILE: Penny/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
+    scheme:
+      testTargets: [PennyTests, PennyUITests]
+      gatherCoverageData: true
+  PennyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [PennyTests]
+    dependencies:
+      - target: Penny
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+  PennyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [PennyUITests]
+    dependencies:
+      - target: Penny
+    settings:
+      GENERATE_INFOPLIST_FILE: YES

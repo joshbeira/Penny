@@ -1,0 +1,41 @@
+name: iOS
+on:
+  push:
+    branches: [main, "codex/**"]
+    paths: ["ios/**", ".github/workflows/ios.yml", "scripts/ios-*.sh"]
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml", "scripts/ios-*.sh"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare native project
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+          xcodegen generate --spec ios/project.yml
+          plutil -lint ios/Penny/Info.plist ios/Penny/PrivacyInfo.xcprivacy
+      - name: Build, test and capture the app
+        run: bash scripts/ios-check.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-verification
+          path: |
+            ios/build/*.xcresult
+            ios/build/*.log
+            ios/build/screenshots/
+            ios/build/Penny-simulator.zip
+            ios/build/Penny-project.zip
+          retention-days: 14

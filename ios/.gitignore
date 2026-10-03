@@ -1,0 +1,8 @@
+Penny.xcodeproj/
+build/
+*.xcresult/
+*.xcarchive/
+*.ipa
+*.mobileprovision
+*.p12
+.DS_Store

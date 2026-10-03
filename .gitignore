@@ -9,5 +9,6 @@ test-results/
 coverage/
 android-evidence/
 release-assets/
+ios-evidence/
 *.log
 .DS_Store
