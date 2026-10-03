@@ -20,6 +20,9 @@ The order below prioritises evidence from real use. Unchecked work is planned, n
 
 ## Next: validate the reader
 
+- [x] Native SwiftUI iPhone/iPad source with Vision OCR, protected local archive and simulator checks
+- [ ] Sign the iOS build, verify physical devices and publish an approved TestFlight invitation
+
 - [ ] Complete five consenting usability sessions and publish anonymised findings
 - [ ] Validate TalkBack, VoiceOver and NVDA flows with human testers
 - [ ] Test camera framing and OCR performance on older phones

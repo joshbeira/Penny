@@ -82,7 +82,7 @@ struct ReaderView: View {
                 case .success(let data): if let data { model.recognize(data); morePhotos = false }
                 case .failure(let error): model.message = error.localizedDescription
                 }
-            }.ignoresSafeArea()
+            }.ignoresSafeArea().modifier(PrivacyShield())
         }
         .alert("Save on this device", isPresented: $showSave) {
             TextField("Letter title", text: $title).accessibilityIdentifier("letter-title")

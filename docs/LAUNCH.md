@@ -16,6 +16,8 @@ People who prefer listening to everyday English post, find small print difficult
 
 This is draft outreach, not a record of messages sent. Ask moderators before posting in a community. Contact people through an appropriate invitation or introduction. [The beta plan](BETA.md) covers consent and study conduct.
 
+The native iOS app is currently a developer preview. Invite Mac/Xcode testers through [the iOS guide](IOS.md); invite ordinary iPhone users to the web app until a signed TestFlight build is available. Do not describe a simulator ZIP as an iPhone download.
+
 ## Five tasks, fifteen minutes
 
 1. Open a sample letter without help.
@@ -39,3 +41,5 @@ Keep contact details separately. Do not record personal letter text, diagnoses, 
 “Built and released Penny, a privacy-first letter-reading companion for Android and the web. Implemented Kotlin/Jetpack Compose and React/TypeScript clients with on-device OCR, offline speech, explicit local persistence, accessible controls and SHA-256-linked practice receipts. Added browser and Android emulator CI covering recognition, persistence, offline use and failure recovery.”
 
 Add adoption and usability outcomes only after measuring them. Separate shipped software, automated verification and human research evidence.
+
+For the iOS work: “Implemented a native SwiftUI iPhone/iPad client with Apple Vision OCR, system speech, actor-isolated atomic persistence and explicit data recovery; added macOS CI for real-image recognition, storage failures and simulator user journeys.” Public TestFlight distribution remains a separate milestone.

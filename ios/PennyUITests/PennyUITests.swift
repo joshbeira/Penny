@@ -20,13 +20,14 @@ final class PennyUITests: XCTestCase {
     }
 
     private func tap(_ element: XCUIElement) {
-        XCTAssertTrue(element.waitForExistence(timeout: 10))
-        for _ in 0..<8 {
-            if element.isHittable { break }
-            app.swipeUp()
+        _ = element.waitForExistence(timeout: 2)
+        for direction in [true, false] {
+            for _ in 0..<8 {
+                if element.exists && element.isHittable { element.tap(); return }
+                if direction { app.swipeUp() } else { app.swipeDown() }
+            }
         }
-        XCTAssertTrue(element.isHittable)
-        element.tap()
+        XCTFail("Control was not reachable: \(element)")
     }
 
     func testSampleSaveSearchReopenRelaunchAndDelete() throws {

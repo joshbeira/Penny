@@ -1,6 +1,16 @@
 # Architecture
 
-Penny has a React/TypeScript PWA and a native Kotlin/Jetpack Compose Android app. Neither has authentication, a hosted document database or bank integration. Each keeps its own explicitly saved letter library, settings and practice receipts on the device.
+Penny has a React/TypeScript PWA, a native Kotlin/Jetpack Compose Android app and a native SwiftUI iOS client. None has authentication, a hosted document database or bank integration. Each keeps its own explicitly saved letter library, settings and practice receipts on the device.
+
+## Native iOS
+
+`PennyModel` is a main-actor observable model shared by SwiftUI screens. `LibraryStore` is a separate actor that serialises archive mutations. It validates a versioned, bounded JSON archive before loading or writing and commits atomically with iOS complete file protection. The parent directory is excluded from backups. Failed writes do not update the visible archive; decoding errors preserve the original file and block ordinary writes until recovery or explicit reset.
+
+`TextRecognition` uses Apple Vision on a serial worker queue, with image downsampling and orientation correction. A locked request object coordinates cancellation and exactly-once continuation completion. A 45-second deadline ends the UI operation; a reading generation prevents late results from replacing newer text. Photo-picker imports are bounded to 30 MB, and camera photos are not written to the library or Photos.
+
+`SpeechReader` uses installed English system voices and bounded utterances. `VoiceCommands` checks device support and requires on-device recognition, with permission on tap, a 12-second session limit and no online fallback. Commands navigate or read; they never confirm practice actions. App backgrounding stops audio and recognition; a privacy overlay covers inactive app snapshots.
+
+The iOS app has no third-party runtime SDKs or networking client. A privacy manifest documents app-container file metadata access. XcodeGen defines the project; macOS CI runs simulator tests and an unsigned device archive. Apple signing and public TestFlight distribution are separate release steps.
 
 ## Native Android
 

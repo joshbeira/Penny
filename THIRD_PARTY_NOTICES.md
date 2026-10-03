@@ -14,3 +14,9 @@ The project does not grant rights in third-party trademarks or imply affiliation
 Kotlin, Kotlin coroutines, AndroidX and Jetpack Compose are distributed under their respective Apache-2.0 licences. Their notices are supplied in dependency artifacts. The Gradle wrapper is part of Gradle (Apache-2.0).
 
 Bundled text recognition uses [Google ML Kit](https://developers.google.com/ml-kit/vision/text-recognition/v2/android); Google’s SDK terms apply. It is a third-party recognition model, not a model trained by Penny. Android system speech and recognition engines are provided by the device vendor or user-selected provider. Dependency coordinates and versions are pinned in `android/app/build.gradle.kts`.
+
+## iOS
+
+The native iOS app uses Apple system frameworks: SwiftUI, Vision, AVFoundation, Speech, PhotosUI, CryptoKit and UIKit. Recognition and speech models are supplied by Apple, not trained by Penny. SF Symbols and Apple SDKs are used under Apple's applicable terms. There are no third-party runtime packages in the iOS client.
+
+[XcodeGen](https://github.com/yonaskolb/XcodeGen), MIT-licensed, generates the development project and is not bundled in the app. The app icon is derived from Penny's existing brand asset.

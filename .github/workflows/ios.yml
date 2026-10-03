@@ -22,18 +22,29 @@ jobs:
       - name: Prepare native project
         run: |
           xcodebuild -version
+          mkdir -p ios/build
+          swiftformat ios/Penny ios/PennyTests ios/PennyUITests --swiftversion 5.9
+          git diff -- ios > ios/build/swiftformat.patch
           brew install xcodegen
           xcodegen --version
           xcodegen generate --spec ios/project.yml
           plutil -lint ios/Penny/Info.plist ios/Penny/PrivacyInfo.xcprivacy
       - name: Build, test and capture the app
         run: bash scripts/ios-check.sh
+      - name: Preserve simulator evidence
+        if: always()
+        run: |
+          if [ -d ios/build/Tests.xcresult ]; then
+            xcrun xcresulttool export attachments --path ios/build/Tests.xcresult --output-path ios/build/screenshots/attachments || true
+            ditto -c -k --sequesterRsrc --keepParent ios/build/Tests.xcresult ios/build/Tests.xcresult.zip
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-verification
           path: |
-            ios/build/*.xcresult
+            ios/build/*.xcresult.zip
+            ios/build/*.patch
             ios/build/*.log
             ios/build/screenshots/
             ios/build/Penny-simulator.zip

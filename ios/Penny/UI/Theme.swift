@@ -51,6 +51,21 @@ struct Eyebrow: View {
     var body: some View { Text(text.uppercased()).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(PennyTheme.amber) }
 }
 
+struct PrivacyShield: ViewModifier {
+    @Environment(\.scenePhase) private var phase
+    func body(content: Content) -> some View {
+        content.overlay {
+            if phase != .active {
+                ZStack {
+                    PennyTheme.background.ignoresSafeArea()
+                    Label("Penny · Private on your device", systemImage: "lock.fill")
+                        .font(.title3.bold()).foregroundStyle(PennyTheme.amber)
+                }.accessibilityHidden(true)
+            }
+        }
+    }
+}
+
 struct ReadingControls: View {
     @EnvironmentObject private var model: PennyModel
     var body: some View {

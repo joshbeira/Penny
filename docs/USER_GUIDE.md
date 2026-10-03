@@ -1,6 +1,6 @@
 # Using Penny
 
-This guide covers the web app. See [Android installation and usage](ANDROID.md) for the native app.
+This guide covers the web app. See [Android installation and usage](ANDROID.md) or [iPhone and iPad build and usage](IOS.md) for the native clients. iOS is currently a developer preview, without a public TestFlight listing.
 
 ## Read a letter
 

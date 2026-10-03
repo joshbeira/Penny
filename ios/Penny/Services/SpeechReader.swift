@@ -6,7 +6,7 @@ import Foundation
 final class SpeechReader: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     @Published private(set) var isSpeaking = false
     private let synthesizer = AVSpeechSynthesizer()
-    private var remaining = 0
+    private var utterances = Set<ObjectIdentifier>()
     var report: ((String) -> Void)?
 
     override init() {
@@ -29,28 +29,29 @@ final class SpeechReader: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
             try AVAudioSession.sharedInstance().setActive(true)
         } catch { report?("Audio is unavailable. Your text remains on screen."); return }
         let chunks = LetterText.chunks(text)
-        remaining = chunks.count
+        utterances = []
         isSpeaking = !chunks.isEmpty
         for chunk in chunks {
             let utterance = AVSpeechUtterance(string: chunk)
             utterance.voice = voice
             utterance.rate = Float(preferences.speechRate)
+            utterances.insert(ObjectIdentifier(utterance))
             synthesizer.speak(utterance)
         }
     }
 
     func stop() {
-        remaining = 0
+        utterances = []
         synthesizer.stopSpeaking(at: .immediate)
         isSpeaking = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
-            guard let self, self.remaining > 0 else { return }
-            self.remaining -= 1
-            if self.remaining == 0 {
+            guard let self, self.utterances.remove(id) != nil else { return }
+            if self.utterances.isEmpty {
                 self.isSpeaking = false
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }

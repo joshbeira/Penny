@@ -2,17 +2,20 @@
   <img src="public/icon.svg" width="76" height="76" alt="Penny" />
   <h1>Penny</h1>
   <p><strong>Every letter. A little clearer.</strong></p>
-  <p>A private, accessible reading companion for Android and the web.<br />Turn printed letters into words you can read, hear, correct and keep.</p>
+  <p>A private, accessible reading companion for Android, iOS and the web.<br />Turn printed letters into words you can read, hear, correct and keep.</p>
   <p>
     <a href="https://joshbeira.github.io/Penny/">Open the web app</a> ·
     <a href="https://github.com/joshbeira/Penny/releases/tag/v2.0.0">Download Android</a> ·
+    <a href="docs/IOS.md">iOS developer preview</a> ·
     <a href="docs/USER_GUIDE.md">User guide</a> ·
     <a href="https://github.com/joshbeira/Penny/issues/new?template=feedback.yml">Give feedback</a>
   </p>
   <p>
     <a href="https://github.com/joshbeira/Penny/actions/workflows/ci.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/ci.yml/badge.svg" alt="Web checks" /></a>
     <a href="https://github.com/joshbeira/Penny/actions/workflows/android.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/android.yml/badge.svg" alt="Android checks" /></a>
+    <a href="https://github.com/joshbeira/Penny/actions/workflows/ios.yml"><img src="https://github.com/joshbeira/Penny/actions/workflows/ios.yml/badge.svg" alt="iOS checks" /></a>
     <img src="https://img.shields.io/badge/Kotlin-Jetpack%20Compose-7F52FF?labelColor=101418" alt="Kotlin and Jetpack Compose" />
+    <img src="https://img.shields.io/badge/Swift-SwiftUI-F05138?labelColor=101418" alt="Swift and SwiftUI" />
     <img src="https://img.shields.io/badge/status-public%20beta-FFB703?labelColor=101418" alt="Public beta" />
   </p>
 </div>
@@ -25,7 +28,9 @@ A collection notice, an appointment letter, an unfamiliar bill. Everyday post sh
 
 The reader is a working utility. The accompanying banking sandbox explores speech, touch, sound and explicit confirmation using synthetic accounts. **Penny is an independent public beta, not a banking service.** It does not connect to banks, move money or order real cards.
 
-## Two apps. The same private reading workflow.
+## The same private reading workflow, across platforms
+
+The web app and Android APK are available now. The native SwiftUI iPhone/iPad app is a **developer preview** with source and simulator verification; public TestFlight and App Store distribution have not been configured.
 
 |                                | Web / installable PWA                                                          | Native Android                                                               |
 | ------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
@@ -42,6 +47,14 @@ Libraries stay on their own device/browser. There is no sync, automatic document
 
 ![Penny Android home, letter reader and saved-letter library in airplane mode](docs/assets/android.png)
 
+### Native iPhone and iPad
+
+The iOS 17+ client uses **SwiftUI, Apple Vision, AVFoundation and Swift actors**. It includes camera/photo import, on-device English OCR, correction and paste, system read-aloud, Dynamic Type, reading preferences, search, favourites, export and deletion. A protected, atomic local archive preserves saved letters and blocks writes when damaged data needs recovery.
+
+The banking sandbox includes spoken overviews, sound cues, haptics, explicit confirmation and SHA-256-linked receipts. Optional voice navigation requires on-device recognition support and never falls back to an online recognizer. App backgrounding stops audio and covers private content.
+
+[Build and use the iOS preview](docs/IOS.md) · [Signing and TestFlight handoff](docs/IOS_RELEASE.md)
+
 ## Try Penny in a minute
 
 1. [Open Penny](https://joshbeira.github.io/Penny/) or [install the Android APK](docs/ANDROID.md).
@@ -54,9 +67,10 @@ Use an installed English offline voice for speech. Number masking is heuristic: 
 
 ## Engineering with clear boundaries
 
-- **Local image processing.** Neither app uploads photographs. Android bundles its recognition model and omits internet permission. The web self-hosts its worker, WebAssembly engine and language data.
+- **Local image processing.** No client uploads photographs. Android bundles its recognition model and omits internet permission. iOS uses Apple Vision. The web self-hosts its worker, WebAssembly engine and language data.
 - **Explicit persistence.** A reading stays transient until saved. Saved text is bounded, exportable and deletable. Browser storage failures preserve the current reading and show an error instead of claiming a successful save.
 - **Lifecycle-aware Android.** A ViewModel exposes immutable state through StateFlow; blocking work runs off the main thread. Speech stops when the app backgrounds. Camera files are temporary, backups are excluded, and recognition handles image orientation and sizing.
+- **Native iOS isolation.** A main-actor model drives SwiftUI; a storage actor serialises atomic writes. Vision processing runs on a worker queue, with cancellation and stale-result protection. The archive uses iOS file protection and is excluded from backups.
 - **Accessible alternatives.** Speech has visible text equivalents. Large controls, readable contrast, keyboard focus, live announcements, scalable text and Quiet Mode support different ways to interact. Automated checks do not substitute for testing with people.
 - **Inspectable practice actions.** Confirmed sandbox actions produce SHA-256 hash-linked receipts. Android writes in database transactions; the web serialises writes. Verification detects inconsistent edits, not a complete rewrite of local history.
 - **Consent-bound AI.** An optional server validates request and response schemas, bounds input and request duration, and preserves the original transcription. Public GitHub Pages has cloud AI disabled.
@@ -66,8 +80,10 @@ flowchart LR
   A[Photo / pasted text] --> B{On-device recognition}
   B --> W[Web: Tesseract worker]
   B --> K[Android: bundled ML Kit]
+  B --> I[iOS: Apple Vision]
   W --> R[Review and correct]
   K --> R
+  I --> R
   R --> S[Device speech]
   R --> E[Export / share]
   R -->|Explicit save| L[Local letter library]
@@ -100,6 +116,18 @@ cd android
 
 On Windows use `gradlew.bat`. The wrapper pins Gradle and verifies its distribution checksum. [Build, signing and installation details](docs/ANDROID.md).
 
+**iOS — macOS, Xcode 26.3, iOS 17+**
+
+```sh
+brew install xcodegen
+xcodegen generate --spec ios/project.yml
+open ios/Penny.xcodeproj
+# Unit, integration and simulator journeys, plus an unsigned device archive:
+bash scripts/ios-check.sh
+```
+
+There are no third-party runtime packages in the iOS app. A simulator build needs no Apple signing credentials. Installing on a physical iPhone and distributing through TestFlight have separate signing requirements. [iOS setup and distribution](docs/IOS.md).
+
 ## Repository map
 
 ```text
@@ -107,6 +135,10 @@ android/                    Native Kotlin app and Gradle wrapper
   app/src/main/             Compose UI, ViewModel, OCR, speech and SQLite storage
   app/src/test/             Kotlin validation, speech and receipt tests
   app/src/androidTest/      Device journeys, actual OCR and persistence tests
+ios/                        Native SwiftUI app and XcodeGen project specification
+  Penny/                    Views, model, Vision, speech and protected archive
+  PennyTests/               Real OCR, persistence, failure and integrity tests
+  PennyUITests/             Simulator reading, library and practice journeys
 src/                        React + TypeScript web app
   components/               Shared controls, installation and speech feedback
   screens/                  Reader, library, home, receipts and settings
@@ -117,7 +149,7 @@ public/                     PWA assets and bundled OCR resources
 tests/                      Browser and server contract tests
 ci/layout-lock/             Reviewed accessibility-tree baselines
 docs/                       User guides, architecture, privacy and launch kit
-.github/                    Web + Android CI, releases and feedback templates
+.github/                    Web, Android and iOS CI, releases and feedback templates
 ```
 
 ## Quality gates
@@ -133,6 +165,8 @@ npm run lock:check
 ```
 
 Web tests cover actual image recognition, offline startup, saved-letter retrieval, correction, storage failure, AI consent, receipt integrity and accessibility. Android CI builds the app, runs Kotlin tests and lint, then exercises a device emulator with networking disabled. Screenshots and reports are retained as workflow artifacts. See [TESTING.md](docs/TESTING.md) for the human test matrix and practical limits.
+
+iOS CI runs real Vision OCR and archive tests, SwiftUI simulator journeys and an unsigned Release archive on a Mac runner. Reports, screenshots and a simulator build are retained. Simulator evidence does not establish physical-camera quality, VoiceOver usability or availability of a signed iPhone download.
 
 ## Built to earn repeat use
 

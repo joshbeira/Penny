@@ -65,6 +65,7 @@ struct PracticeView: View {
                 .navigationTitle("Confirm practice")
             }
             .presentationDetents([.large])
+            .modifier(PrivacyShield())
         }
         .onDisappear { model.stopAudio() }
     }

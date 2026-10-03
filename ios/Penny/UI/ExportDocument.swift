@@ -39,5 +39,6 @@ struct ExportView: View {
         }
         .preferredColorScheme(.dark)
         .tint(PennyTheme.amber)
+        .modifier(PrivacyShield())
     }
 }

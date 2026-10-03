@@ -1,8 +1,8 @@
 # Privacy and data
 
-Last updated: 30 September 2026.
+Last updated: 4 October 2026.
 
-Penny has no application analytics, sign-in or advertising. Both apps have an optional **local** letter library; neither has a hosted document database or cross-device sync.
+Penny has no application analytics, sign-in or advertising. The web, Android and iOS clients have optional **local** letter libraries; none has a hosted document database or cross-device sync. The table below covers web and Android; iOS details follow it.
 
 | Data                  | Web                                                                  | Android                                                                        | Retention                                                                                                                                                                                                |
 | --------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -24,3 +24,15 @@ Number masking is a convenience, not anonymisation. It may hide useful dates and
 **Clear letter** clears the reading; it does not delete saved copies. Delete a saved letter in **Library**, or delete the whole library after exporting if needed. Practice receipts have separate deletion controls. Clearing browser site data or Android app data removes persistent app data and cached assets. Uninstalling Android removes its private library.
 
 For privacy reports, follow [SECURITY.md](../SECURITY.md). Do not post personal correspondence in public issues.
+
+## iPhone and iPad developer preview
+
+Apple Vision recognises text on the device. Camera photos are transient and are not saved to Photos. The system photo picker exposes only selected items; it may download an iCloud-only original according to Photos settings. Penny does not upload photos or letters. No cloud AI or application network client is included in the iOS app.
+
+Saved letters, preferences and practice receipts share a versioned file in the app container, written atomically with iOS complete file protection. The containing directory is excluded from backups. Anyone who can unlock the device and open Penny can read its library; no separate app lock is provided. There is no sync. Up to 100 letters of 16,000 characters are supported, subject to a 12 MB archive limit. Unsaved readings remain in memory through navigation and rotation, but are lost when the process terminates.
+
+Read-aloud uses installed English system voices. Optional voice commands request Microphone and Speech permission when tapped, check on-device recognition support, and require on-device processing without online fallback. Penny stores no audio recordings. Audio stops in the background, and private app views are covered while inactive.
+
+Explicit exports use Files or the share sheet. Choosing iCloud Drive or another app places a copy outside Penny; that destination controls storage and deletion. Deleting a letter or the app does not remove these copies. A damaged local archive is preserved for recovery export until you explicitly reset it. Feedback links open GitHub in a browser and do not automatically attach reading contents.
+
+The privacy manifest declares no tracking or collected data and documents app-container file metadata access. No third-party runtime SDKs are included. [Full iOS guide](IOS.md).

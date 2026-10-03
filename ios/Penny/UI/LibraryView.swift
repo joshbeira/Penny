@@ -32,6 +32,7 @@ struct LibraryView: View {
                     Button { Task { await model.favourite(letter) } } label: {
                         Label(letter.favourite ? "Remove favourite" : "Add favourite", systemImage: letter.favourite ? "star.fill" : "star")
                     }.buttonStyle(PennyButtonStyle()).disabled(model.busy)
+                        .accessibilityLabel(letter.favourite ? "Remove favourite" : "Add favourite")
                     Button("Delete \(letter.title)", role: .destructive) { deleting = letter }.frame(minHeight: 44).disabled(model.busy)
                 }
             }

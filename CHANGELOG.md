@@ -1,5 +1,18 @@
 # Changelog
 
+## iOS developer preview 2.1.0 — 2026-10-04
+
+### Added
+
+- Native SwiftUI client for iPhone and iPad on iOS 17+, with Apple Vision recognition, camera/photo import and editable or pasted text.
+- System speech, on-device voice commands where supported, reading preferences and Quiet Mode.
+- Explicit letter saving, search, favourites, export, deletion and protected local persistence with corrupt-data recovery.
+- Banking practice with spoken and sound feedback, haptics, confirmation and verifiable receipts.
+- macOS CI for actual OCR, storage and simulator journeys, screenshots and an unsigned device archive.
+- iOS setup, privacy, physical-device validation and TestFlight handoff documentation. Public iOS distribution is not yet configured.
+
+Web and Android remain at their published 2.0.0 versions.
+
 ## 2.0.0 — 2026-10-03
 
 ### Added

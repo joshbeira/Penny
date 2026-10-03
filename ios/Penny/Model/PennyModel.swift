@@ -194,7 +194,7 @@ final class PennyModel: ObservableObject {
         let command = command.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ".", with: "")
         switch command {
         case "stop", "stop reading": stopAudio(); message = "Stopped."
-        case "read aloud", "read this", "read it": tab = .read; readAloud()
+        case "read aloud", "read this", "read it": path = []; tab = .read; readAloud()
         case "home", "go home": navigate(.home)
         case "read", "read a letter", "letter": navigate(.read)
         case "library", "my letters": navigate(.library)

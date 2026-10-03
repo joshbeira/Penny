@@ -136,6 +136,9 @@ actor LibraryStore {
         try next.validate()
         try prepareDirectory()
         let data = try Self.encoder().encode(next)
+        guard data.count <= 12_000_000 else {
+            throw PennyError.message("The local archive is full. Export and delete older letters or receipts before saving more.")
+        }
         try data.write(to: file, options: [.atomic, .completeFileProtection])
         archive = next
         return next
