@@ -1,0 +1,33 @@
+name: Expand iOS test evidence
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: iOS workflow run containing the ios-test-results artifact
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    runs-on: macos-15
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-test-results
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: evidence
+      - name: Export screenshots, recordings and UI snapshots
+        run: |
+          ditto -x -k evidence/Tests.xcresult.zip evidence
+          xcrun xcresulttool export attachments --path evidence/Tests.xcresult --output-path evidence/attachments
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-expanded-evidence
+          path: evidence/attachments/
+          retention-days: 7
