@@ -44,6 +44,8 @@ open ios/Penny.xcodeproj
 
 Choose the **Penny** scheme and an iPhone or iPad simulator, then Run. `ios/project.yml` is the source of truth; the generated Xcode project is ignored. The app identifier is `io.github.joshbeira.penny`.
 
+The [iOS 2.1.0 preview release](https://github.com/joshbeira/Penny/releases/tag/ios-v2.1.0) also provides a prebuilt app for an **Apple Silicon Mac and iOS 26.2 Simulator**. Extract the ZIP and drag `Penny.app` into a booted simulator. This download is not installable on a physical iPhone.
+
 For a personal iPhone, select your signing team in Xcode and choose the connected device. You may need a unique bundle identifier for your own team. Apple permits personal-device testing through a Personal Team, with provisioning limitations. See [Apple's membership comparison](https://developer.apple.com/support/compare-memberships/).
 
 ## Build and verify

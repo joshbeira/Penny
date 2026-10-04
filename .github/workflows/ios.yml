@@ -23,8 +23,7 @@ jobs:
         run: |
           xcodebuild -version
           mkdir -p ios/build
-          swiftformat ios/Penny ios/PennyTests ios/PennyUITests --swiftversion 5.9
-          git diff -- ios > ios/build/swiftformat.patch
+          swiftformat ios/Penny ios/PennyTests ios/PennyUITests --swiftversion 5.9 --lint
           brew install xcodegen
           xcodegen --version
           xcodegen generate --spec ios/project.yml
@@ -43,7 +42,6 @@ jobs:
         with:
           name: ios-verification
           path: |
-            ios/build/*.patch
             ios/build/*.log
             ios/build/screenshots/**/*.png
             ios/build/screenshots/**/manifest.json

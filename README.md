@@ -55,6 +55,8 @@ The banking sandbox includes spoken overviews, sound cues, haptics, explicit con
 
 [Build and use the iOS preview](docs/IOS.md) · [Signing and TestFlight handoff](docs/IOS_RELEASE.md)
 
+![Penny iPhone home, letter reader and saved-letter library](docs/assets/ios.png)
+
 ## Try Penny in a minute
 
 1. [Open Penny](https://joshbeira.github.io/Penny/) or [install the Android APK](docs/ANDROID.md).

@@ -32,6 +32,6 @@ For Android, use JDK 17 and run `./gradlew :app:testDebugUnitTest :app:lintDebug
 
 Include steps, expected behaviour, actual behaviour, browser and assistive technology where relevant. Never upload personal correspondence. Use [private security reporting](SECURITY.md) for vulnerabilities.
 
-For iOS, generate the project with `xcodegen generate --spec ios/project.yml` and run `bash scripts/ios-check.sh` on a Mac with Xcode. Keep Vision processing local, require on-device voice recognition, preserve corrupt archives, and keep saving explicit. Use synthetic content in tests and screenshots. Never commit signing certificates, provisioning profiles or Apple credentials. See [IOS.md](docs/IOS.md).
+For iOS, generate the project with `xcodegen generate --spec ios/project.yml` and run `bash scripts/ios-check.sh` on a Mac with Xcode. Format Swift sources with `swiftformat ios/Penny ios/PennyTests ios/PennyUITests --swiftversion 5.9`; CI checks this with `--lint`. Keep Vision processing local, require on-device voice recognition, preserve corrupt archives, and keep saving explicit. Use synthetic content in tests and screenshots. Never commit signing certificates, provisioning profiles or Apple credentials. See [IOS.md](docs/IOS.md).
 
 Be respectful of contributors and testers. Accessibility needs vary; describe observed barriers rather than making assumptions about people.

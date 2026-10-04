@@ -67,7 +67,13 @@ struct PracticeView: View {
             .presentationDetents([.large])
             .modifier(PrivacyShield())
         }
-        .onDisappear { model.stopAudio() }
+        .onDisappear {
+            // Tab changes already stop outgoing audio. Do not cancel speech just
+            // started in the reader by a voice command during that transition.
+            if model.tab == .home || model.tab == .settings {
+                model.stopAudio()
+            }
+        }
     }
 }
 

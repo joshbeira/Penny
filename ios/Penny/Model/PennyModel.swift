@@ -136,7 +136,9 @@ final class PennyModel: ObservableObject {
     }
 
     func cancelReading() {
-        if recognizing { message = "Reading cancelled. Your previous text is unchanged." }
+        if recognizing {
+            message = "Reading cancelled. Your previous text is unchanged."
+        }
         readingID = UUID()
         readingTask?.cancel()
         readingTask = nil

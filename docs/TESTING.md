@@ -15,9 +15,11 @@ The Android workflow runs an API 35 emulator in airplane mode and retains screen
 
 ## Native iOS verification
 
-The iOS workflow generates the Xcode project, runs XCTest on an available iPhone simulator and builds an unsigned Release archive for physical iOS devices. Tests include actual Apple Vision recognition of a generated letter, invalid-image rejection, concurrent and failed saves, corrupt-file recovery, stale OCR cancellation, schema validation and receipt tampering. UI journeys exercise sample reading, saving, favourites, search, relaunch/persistence, deletion, camera unavailability, rotation, practice confirmation and the export screen.
+The iOS workflow generates the Xcode project, runs XCTest on an available iPhone simulator and builds an unsigned Release archive for physical iOS devices. Tests include actual Apple Vision recognition of a generated letter, invalid-image rejection, concurrent and failed saves, corrupt-file recovery, stale OCR cancellation, schema validation and receipt tampering. UI journeys exercise sample reading, editing, reading preferences, Quiet Mode, saving, favourites, search, relaunch/persistence, deletion, camera unavailability, rotation, practice confirmation and the export screen.
 
-Screenshots and the `.xcresult` bundle are retained in `ios-verification`, alongside a simulator app ZIP. The simulator is not isolated from the Mac's network, so these checks are not claimed as an airplane-mode iPhone test. Physical OCR, installed voices, permission prompts, haptics, background snapshots and VoiceOver still require device testing.
+Screenshots and logs are retained in `ios-verification`, the `.xcresult` bundle in `ios-test-results`, and the generated project and simulator app in `ios-simulator-build`. The simulator is not isolated from the Mac's network, so these checks are not claimed as an airplane-mode iPhone test. Physical OCR, installed voices, permission prompts, haptics, background snapshots and VoiceOver still require device testing.
+
+**Recorded verification — 4 October 2026:** [8 core tests and 4 UI journeys passed](https://github.com/joshbeira/Penny/actions/runs/37210424765) on iPhone 17 Pro / iOS 26.2 Simulator, using Xcode 26.3. The unsigned device Release archive also succeeded. The iOS screenshots in the README come from this run and use a fictional sample letter.
 
 ## Before widening distribution
 
