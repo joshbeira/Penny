@@ -47,12 +47,12 @@ final class SpeechReader: NSObject, ObservableObject, AVSpeechSynthesizerDelegat
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    nonisolated func speechSynthesizer(_: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         let id = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
-            guard let self, self.utterances.remove(id) != nil else { return }
-            if self.utterances.isEmpty {
-                self.isSpeaking = false
+            guard let self, utterances.remove(id) != nil else { return }
+            if utterances.isEmpty {
+                isSpeaking = false
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
         }

@@ -53,7 +53,7 @@ xcodegen generate --spec ios/project.yml
 bash scripts/ios-check.sh
 ```
 
-The script selects an available iPhone simulator, runs unit/integration/UI tests, captures evidence, and creates an **unsigned device archive**. CI retains the result bundle, screenshots, generated project and a simulator app ZIP as `ios-verification`. A simulator app runs only in the matching Mac simulator environment; neither it nor an unsigned archive is an installable iPhone release.
+The script selects an available iPhone simulator, runs unit/integration/UI tests, captures evidence, and creates an **unsigned device archive**. CI retains screenshots and logs as `ios-verification`, the Xcode result bundle as `ios-test-results`, and the generated project and simulator app ZIP as `ios-simulator-build`. A simulator app runs only in the matching Mac simulator environment; neither it nor an unsigned archive is an installable iPhone release.
 
 Tests cover actual Vision recognition on a synthetic image, invalid images, archive limits, concurrent saves, persistence, failed writes, corrupt-data recovery, stale OCR results, receipt tampering, sample/library journeys, confirmation and orientation changes. See [TESTING.md](TESTING.md) for physical-device and accessibility work that still needs human verification.
 

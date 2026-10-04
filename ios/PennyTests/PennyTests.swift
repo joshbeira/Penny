@@ -1,14 +1,16 @@
 import Foundation
+@testable import Penny
 import UIKit
 import XCTest
-@testable import Penny
 
 final class PennyTests: XCTestCase {
-    private func directory() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("PennyTests-\(UUID())") }
+    private func directory() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("PennyTests-\(UUID())")
+    }
 
     func testReadingBoundsMaskingAndUnicodeSpeech() throws {
         XCTAssertThrowsError(try LetterText.checked("  \n"))
-        XCTAssertThrowsError(try LetterText.checked(String(repeating: "x", count: 16_001)))
+        XCTAssertThrowsError(try LetterText.checked(String(repeating: "x", count: 16001)))
         XCTAssertEqual(try LetterText.checked("  Library letter  "), "Library letter")
         XCTAssertEqual(LetterText.mask("Account 12345678, code 12-34-56, £79.00"), "Account ••••, code ••-••-••, £79.00")
         let text = String(repeating: "Read café 👩🏽‍💻 carefully. ", count: 180)
@@ -81,11 +83,11 @@ final class PennyTests: XCTestCase {
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1
             format.opaque = true
-            return UIGraphicsImageRenderer(size: CGSize(width: 1_200, height: 700), format: format).pngData { context in
+            return UIGraphicsImageRenderer(size: CGSize(width: 1200, height: 700), format: format).pngData { context in
                 UIColor.white.setFill()
-                context.fill(CGRect(x: 0, y: 0, width: 1_200, height: 700))
+                context.fill(CGRect(x: 0, y: 0, width: 1200, height: 700))
                 let text = "Oak Street Library\nYour books are ready to collect.\nPlease bring your library card on Friday."
-                (text as NSString).draw(in: CGRect(x: 70, y: 70, width: 1_060, height: 550), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.black])
+                (text as NSString).draw(in: CGRect(x: 70, y: 70, width: 1060, height: 550), withAttributes: [.font: UIFont.systemFont(ofSize: 48), .foregroundColor: UIColor.black])
             }
         }
         let text = try await TextRecognition().recognize(data)
@@ -102,8 +104,10 @@ final class PennyTests: XCTestCase {
         let model = PennyModel(store: LibraryStore(directory: directory), recognizer: controlled)
         await model.load()
         model.recognize(Data([1, 2, 3]))
-        for _ in 0..<100 {
-            if await controlled.started { break }
+        for _ in 0 ..< 100 {
+            if await controlled.started {
+                break
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         let started = await controlled.started
@@ -115,10 +119,15 @@ final class PennyTests: XCTestCase {
         XCTAssertFalse(model.recognizing)
         await model.save(title: "Library")
         model.edit("Unsaved changes")
-        model.open(try XCTUnwrap(model.archive.letters.first))
+        XCTAssertEqual(model.message, "Changes are not saved yet.")
+        try model.open(XCTUnwrap(model.archive.letters.first))
         XCTAssertEqual(model.text, LetterText.sample)
         model.handleCommand("flag a payment")
         XCTAssertTrue(model.archive.receipts.isEmpty, "Voice must not bypass financial-practice confirmation")
+        model.tab = .library
+        model.handleCommand("receipts")
+        XCTAssertEqual(model.tab, .home)
+        XCTAssertEqual(model.path, [.receipts])
     }
 
     func testUnknownSchemaAndInvalidSettingsAreRejected() throws {
@@ -133,9 +142,15 @@ final class PennyTests: XCTestCase {
 
 private actor ControlledRecognizer: TextRecognizing {
     private var continuation: CheckedContinuation<String, Error>?
-    var started: Bool { continuation != nil }
-    func recognize(_ data: Data) async throws -> String {
+    var started: Bool {
+        continuation != nil
+    }
+
+    func recognize(_: Data) async throws -> String {
         try await withCheckedThrowingContinuation { continuation = $0 }
     }
-    func finish() { continuation?.resume(returning: "Late obsolete photo"); continuation = nil }
+
+    func finish() {
+        continuation?.resume(returning: "Late obsolete photo"); continuation = nil
+    }
 }

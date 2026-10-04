@@ -73,14 +73,18 @@ struct ReaderView: View {
             ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done editing") { editing = false } }
         }
         .onChange(of: photo) { _, item in
-            if let item { model.importPhoto(item); photo = nil; morePhotos = false }
+            if let item {
+                model.importPhoto(item); photo = nil; morePhotos = false
+            }
         }
         .sheet(isPresented: $showCamera) {
             CameraPicker { result in
                 showCamera = false
                 switch result {
-                case .success(let data): if let data { model.recognize(data); morePhotos = false }
-                case .failure(let error): model.message = error.localizedDescription
+                case let .success(data): if let data {
+                        model.recognize(data); morePhotos = false
+                    }
+                case let .failure(error): model.message = error.localizedDescription
                 }
             }.ignoresSafeArea().modifier(PrivacyShield())
         }
@@ -101,7 +105,10 @@ struct ReaderView: View {
             model.message = "A camera is unavailable here. Choose a photo or paste text instead."; return
         }
         let granted = await AVCaptureDevice.requestAccess(for: .video)
-        if granted { showCamera = true }
-        else { model.message = "Camera access is off. Enable it in iOS Settings → Penny, or choose a photo instead." }
+        if granted {
+            showCamera = true
+        } else {
+            model.message = "Camera access is off. Enable it in iOS Settings → Penny, or choose a photo instead."
+        }
     }
 }

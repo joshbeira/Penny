@@ -8,14 +8,16 @@ struct LibraryArchive: Codable, Equatable, Sendable {
     var preferences = ReadingPreferences()
 
     func validate() throws {
-        guard version == 1, revision >= 0, letters.count <= 100, receipts.count <= 1_000,
-              Set(letters.map(\.id)).count == letters.count, preferences.valid else {
+        guard version == 1, revision >= 0, letters.count <= 100, receipts.count <= 1000,
+              Set(letters.map(\.id)).count == letters.count, preferences.valid
+        else {
             throw PennyError.message("The saved library format could not be read. The original file has been preserved.")
         }
         for letter in letters {
             _ = try LetterText.checked(letter.text)
             guard !letter.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  letter.title.count <= 100, letter.createdAt.timeIntervalSince1970.isFinite else {
+                  letter.title.count <= 100, letter.createdAt.timeIntervalSince1970.isFinite
+            else {
                 throw PennyError.message("A saved letter could not be read. The original file has been preserved.")
             }
         }
@@ -29,9 +31,13 @@ struct LibraryArchive: Codable, Equatable, Sendable {
 actor LibraryStore {
     let directory: URL
     private var archive: LibraryArchive?
-    private var file: URL { directory.appendingPathComponent("library-v1.json") }
+    private var file: URL {
+        directory.appendingPathComponent("library-v1.json")
+    }
 
-    init(directory: URL) { self.directory = directory }
+    init(directory: URL) {
+        self.directory = directory
+    }
 
     static func applicationDirectory() -> URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -46,7 +52,9 @@ actor LibraryStore {
     }
 
     func load() throws -> LibraryArchive {
-        if let archive { return archive }
+        if let archive {
+            return archive
+        }
         try prepareDirectory()
         guard FileManager.default.fileExists(atPath: file.path) else {
             let empty = LibraryArchive()
@@ -67,7 +75,7 @@ actor LibraryStore {
         guard next.letters.count < 100 else { throw PennyError.message("Your library has 100 letters. Export or delete a letter before saving another.") }
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, title.count <= 100 else { throw PennyError.message("Enter a title of up to 100 characters.") }
-        next.letters.insert(SavedLetter(title: title, text: try LetterText.checked(text)), at: 0)
+        try next.letters.insert(SavedLetter(title: title, text: LetterText.checked(text)), at: 0)
         return try commit(next)
     }
 
@@ -98,7 +106,7 @@ actor LibraryStore {
 
     func confirm(_ action: PracticeAction) throws -> LibraryArchive {
         var next = try load()
-        guard next.receipts.count < 1_000 else { throw PennyError.message("Export and clear your practice receipts before adding more.") }
+        guard next.receipts.count < 1000 else { throw PennyError.message("Export and clear your practice receipts before adding more.") }
         next.receipts.append(Receipt.make(action: action.title, details: action.details, previous: next.receipts.last?.hash ?? Receipt.genesis))
         return try commit(next)
     }

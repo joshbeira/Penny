@@ -33,7 +33,9 @@ final class PennyModel: ObservableObject {
     private let recognizer: any TextRecognizing
     private var readingTask: Task<Void, Never>?
     private var readingID = UUID()
-    var preferences: ReadingPreferences { archive.preferences }
+    var preferences: ReadingPreferences {
+        archive.preferences
+    }
 
     init(store: LibraryStore = LibraryStore(directory: LibraryStore.applicationDirectory()), recognizer: any TextRecognizing = TextRecognition()) {
         self.store = store
@@ -60,7 +62,11 @@ final class PennyModel: ObservableObject {
         speech.stop()
         text = String(value.prefix(LetterText.limit))
         source = "Your reviewed text"
-        if value.count > LetterText.limit { message = "A reading can contain up to 16,000 characters. Read longer letters a page at a time." }
+        if value.count > LetterText.limit {
+            message = "A reading can contain up to 16,000 characters. Read longer letters a page at a time."
+        } else {
+            message = "Changes are not saved yet."
+        }
     }
 
     func sample() {
@@ -98,7 +104,9 @@ final class PennyModel: ObservableObject {
         }
     }
 
-    func recognize(_ data: Data) { beginReading { data } }
+    func recognize(_ data: Data) {
+        beginReading { data }
+    }
 
     private func beginReading(load: @escaping () async throws -> Data) {
         cancelReading()
@@ -112,22 +120,23 @@ final class PennyModel: ObservableObject {
             do {
                 let data = try await load()
                 try Task.checkCancellation()
-                let result = try await self.recognizer.recognize(data)
-                guard !Task.isCancelled, self.readingID == id else { return }
-                self.text = mask ? LetterText.mask(result) : result
-                self.source = "Read from your photo · check names, dates and amounts"
-                self.message = "Photo read. Review and correct the text before saving."
+                let result = try await recognizer.recognize(data)
+                guard !Task.isCancelled, readingID == id else { return }
+                text = mask ? LetterText.mask(result) : result
+                source = "Read from your photo · check names, dates and amounts"
+                message = "Photo read. Review and correct the text before saving."
             } catch {
-                guard !Task.isCancelled, self.readingID == id else { return }
-                self.message = "\(error.localizedDescription)\(self.text.isEmpty ? "" : " Your previous reading is still on screen.")"
+                guard !Task.isCancelled, readingID == id else { return }
+                message = "\(error.localizedDescription)\(text.isEmpty ? "" : " Your previous reading is still on screen.")"
             }
-            guard self.readingID == id else { return }
-            self.recognizing = false
-            self.readingTask = nil
+            guard readingID == id else { return }
+            recognizing = false
+            readingTask = nil
         }
     }
 
     func cancelReading() {
+        if recognizing { message = "Reading cancelled. Your previous text is unchanged." }
         readingID = UUID()
         readingTask?.cancel()
         readingTask = nil
@@ -136,24 +145,47 @@ final class PennyModel: ObservableObject {
 
     func save(title: String) async {
         let reviewedText = text
-        await mutate(success: "Saved on this device.") { try await self.store.save(title: title, text: reviewedText) }
+        if await mutate(operation: { try await self.store.save(title: title, text: reviewedText) }) {
+            message = text == reviewedText ? "Saved on this device." : "The earlier copy was saved. Your latest changes are not saved yet."
+        }
     }
-    func favourite(_ letter: SavedLetter) async { await mutate { try await self.store.favourite(letter.id) } }
-    func delete(_ letter: SavedLetter) async { await mutate(success: "Letter deleted from this library.") { try await self.store.delete(letter.id) } }
-    func deleteLetters() async { await mutate(success: "Saved letters deleted. Exported copies are unaffected.") { try await self.store.deleteLetters() } }
-    func deleteReceipts() async { await mutate(success: "Practice receipts deleted.") { try await self.store.deleteReceipts() } }
-    func confirm(_ action: PracticeAction) async { await mutate(success: "Practice action recorded. Nothing was sent to a bank.") { try await self.store.confirm(action) } }
+
+    func favourite(_ letter: SavedLetter) async {
+        await mutate { try await self.store.favourite(letter.id) }
+    }
+
+    func delete(_ letter: SavedLetter) async {
+        await mutate(success: "Letter deleted from this library.") { try await self.store.delete(letter.id) }
+    }
+
+    func deleteLetters() async {
+        await mutate(success: "Saved letters deleted. Exported copies are unaffected.") { try await self.store.deleteLetters() }
+    }
+
+    func deleteReceipts() async {
+        await mutate(success: "Practice receipts deleted.") { try await self.store.deleteReceipts() }
+    }
+
+    func confirm(_ action: PracticeAction) async {
+        await mutate(success: "Practice action recorded. Nothing was sent to a bank.") { try await self.store.confirm(action) }
+    }
+
     func setPreferences(_ next: ReadingPreferences) async {
         stopAudio()
         await mutate { try await self.store.settings(next) }
     }
 
-    private func mutate(success: String? = nil, operation: () async throws -> LibraryArchive) async {
-        guard !busy, loaded, !storageUnavailable else { message = "Wait for the library to finish, or recover it in Settings."; return }
+    @discardableResult
+    private func mutate(success: String? = nil, operation: () async throws -> LibraryArchive) async -> Bool {
+        guard !busy, loaded, !storageUnavailable else { message = "Wait for the library to finish, or recover it in Settings."; return false }
         busy = true
         defer { busy = false }
-        do { archive = try await operation(); if let success { message = success } }
-        catch { message = "Could not save this change. \(error.localizedDescription) Your current reading is still available." }
+        do {
+            archive = try await operation(); if let success {
+                message = success
+            }
+            return true
+        } catch { message = "Could not save this change. \(error.localizedDescription) Your current reading is still available."; return false }
     }
 
     func resetStorage() async {
@@ -165,16 +197,21 @@ final class PennyModel: ObservableObject {
     }
 
     func exportLibrary() {
-        do { export = ExportFile(name: "penny-letters.json", data: try LibraryStore.encoder().encode(archive.letters), json: true) }
+        do { export = try ExportFile(name: "penny-letters.json", data: LibraryStore.encoder().encode(archive.letters), json: true) }
         catch { message = "The export could not be prepared." }
     }
+
     func exportReceipts() {
-        do { export = ExportFile(name: "penny-receipts.json", data: try LibraryStore.encoder().encode(archive.receipts), json: true) }
+        do { export = try ExportFile(name: "penny-receipts.json", data: LibraryStore.encoder().encode(archive.receipts), json: true) }
         catch { message = "The export could not be prepared." }
     }
-    func exportText() { export = ExportFile(name: "penny-letter.txt", data: Data(text.utf8), json: false) }
+
+    func exportText() {
+        export = ExportFile(name: "penny-letter.txt", data: Data(text.utf8), json: false)
+    }
+
     func exportRecovery() async {
-        do { export = ExportFile(name: "penny-recovery.json", data: try await store.recoveryData(), json: true) }
+        do { export = try await ExportFile(name: "penny-recovery.json", data: store.recoveryData(), json: true) }
         catch { message = "The recovery copy could not be opened. \(error.localizedDescription)" }
     }
 
@@ -183,12 +220,16 @@ final class PennyModel: ObservableObject {
         sounds.stop()
         speech.read(value ?? text, preferences: preferences)
     }
+
     func talk() async {
         speech.stop()
         sounds.stop()
         await voice.start()
     }
-    func stopAudio() { voice.stop(); speech.stop(); sounds.stop() }
+
+    func stopAudio() {
+        voice.stop(); speech.stop(); sounds.stop()
+    }
 
     func handleCommand(_ command: String) {
         let command = command.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ".", with: "")
@@ -199,8 +240,8 @@ final class PennyModel: ObservableObject {
         case "read", "read a letter", "letter": navigate(.read)
         case "library", "my letters": navigate(.library)
         case "settings", "preferences": navigate(.settings)
-        case "banking", "practice": stopAudio(); path = [.practice]
-        case "receipts": stopAudio(); path = [.receipts]
+        case "banking", "practice": navigate(.home); path = [.practice]
+        case "receipts": navigate(.home); path = [.receipts]
         default: message = "Command not recognised. Try home, read a letter, read aloud, library, settings, banking, receipts or stop."
         }
     }

@@ -8,6 +8,7 @@ enum PennyTheme {
 }
 
 struct PennyPage<Content: View>: View {
+    @EnvironmentObject private var model: PennyModel
     @ViewBuilder let content: Content
     var body: some View {
         ScrollView {
@@ -18,6 +19,18 @@ struct PennyPage<Content: View>: View {
         }
         .background(PennyTheme.background)
         .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !model.message.isEmpty {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(model.message).font(.callout).accessibilityIdentifier("status-message")
+                    Spacer(minLength: 0)
+                    Button { model.message = "" } label: { Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44) }
+                        .accessibilityLabel("Dismiss message")
+                }
+                .padding(.leading, 16).padding(.vertical, 8)
+                .background(PennyTheme.surface)
+            }
+        }
     }
 }
 
@@ -48,7 +61,9 @@ struct PennyButtonStyle: ButtonStyle {
 
 struct Eyebrow: View {
     let text: String
-    var body: some View { Text(text.uppercased()).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(PennyTheme.amber) }
+    var body: some View {
+        Text(text.uppercased()).font(.caption.weight(.semibold)).tracking(1.2).foregroundStyle(PennyTheme.amber)
+    }
 }
 
 struct PrivacyShield: ViewModifier {
@@ -70,6 +85,7 @@ struct ReadingControls: View {
     @EnvironmentObject private var model: PennyModel
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("Letter text size").font(.headline)
             Picker("Letter text size", selection: Binding(get: { model.preferences.textSize }, set: { value in
                 var preferences = model.preferences; preferences.textSize = value
                 Task { await model.setPreferences(preferences) }
@@ -80,6 +96,7 @@ struct ReadingControls: View {
                 Text("Largest").tag(34.0)
             }
             .accessibilityIdentifier("text-size")
+            Text("Reading speed").font(.headline)
             Picker("Reading speed", selection: Binding(get: { model.preferences.speechRate }, set: { value in
                 var preferences = model.preferences; preferences.speechRate = value
                 Task { await model.setPreferences(preferences) }

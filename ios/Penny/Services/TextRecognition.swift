@@ -52,15 +52,17 @@ private final class RecognitionJob: @unchecked Sendable {
         }
     }
 
-    func cancel() { finish(.failure(CancellationError())) }
+    func cancel() {
+        finish(.failure(CancellationError()))
+    }
 
     private func finish(_ result: Result<String, Error>) {
         lock.lock()
         guard !ended else { lock.unlock(); return }
         ended = true
-        let continuation = self.continuation
+        let continuation = continuation
         self.continuation = nil
-        let request = self.request
+        let request = request
         self.request = nil
         lock.unlock()
         request?.cancel()
@@ -68,15 +70,20 @@ private final class RecognitionJob: @unchecked Sendable {
     }
 
     private func perform(_ data: Data) {
+        lock.lock()
+        let cancelled = ended
+        lock.unlock()
+        guard !cancelled else { return }
         do {
             guard !data.isEmpty, data.count <= ImportedPhoto.byteLimit,
                   let source = CGImageSourceCreateWithData(data as CFData, nil),
                   let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 2_400,
-                    kCGImageSourceShouldCacheImmediately: true
-                  ] as CFDictionary) else {
+                      kCGImageSourceCreateThumbnailFromImageAlways: true,
+                      kCGImageSourceCreateThumbnailWithTransform: true,
+                      kCGImageSourceThumbnailMaxPixelSize: 2400,
+                      kCGImageSourceShouldCacheImmediately: true,
+                  ] as CFDictionary)
+            else {
                 throw PennyError.message("This photo could not be opened. Choose a JPEG, PNG or HEIC image.")
             }
             let request = VNRecognizeTextRequest()
@@ -93,7 +100,7 @@ private final class RecognitionJob: @unchecked Sendable {
             lock.unlock()
             try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
             let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-            finish(.success(try LetterText.checked(text)))
+            try finish(.success(LetterText.checked(text)))
         } catch { finish(.failure(error)) }
     }
 }

@@ -43,10 +43,21 @@ jobs:
         with:
           name: ios-verification
           path: |
-            ios/build/*.xcresult.zip
             ios/build/*.patch
             ios/build/*.log
-            ios/build/screenshots/
+            ios/build/screenshots/**/*.png
+            ios/build/screenshots/**/manifest.json
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-test-results
+          path: ios/build/*.xcresult.zip
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: |
             ios/build/Penny-simulator.zip
             ios/build/Penny-project.zip
           retention-days: 14

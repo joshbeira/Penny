@@ -10,6 +10,7 @@ struct LibraryView: View {
             (!favourites || $0.favourite) && (query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) || $0.text.localizedCaseInsensitiveContains(query))
         }
     }
+
     var body: some View {
         PennyPage {
             Eyebrow(text: "Your words, kept close")
@@ -41,9 +42,15 @@ struct LibraryView: View {
             }
         }
         .navigationTitle("Your library").navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog("Delete this saved letter?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
+        .confirmationDialog("Delete this saved letter?", isPresented: Binding(get: { deleting != nil }, set: {
+            if !$0 {
+                deleting = nil
+            }
+        }), titleVisibility: .visible) {
             Button("Delete letter", role: .destructive) {
-                if let letter = deleting { Task { await model.delete(letter) } }
+                if let letter = deleting {
+                    Task { await model.delete(letter) }
+                }
                 deleting = nil
             }
         } message: { Text("It will be removed from this device library. Exported copies are unaffected.") }

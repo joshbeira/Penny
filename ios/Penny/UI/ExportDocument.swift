@@ -4,9 +4,17 @@ import UniformTypeIdentifiers
 struct ExportDocument: FileDocument {
     static let readableContentTypes: [UTType] = [.plainText, .json]
     let data: Data
-    init(data: Data) { self.data = data }
-    init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
+    func fileWrapper(configuration _: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
+    }
 }
 
 struct ExportView: View {
@@ -26,7 +34,9 @@ struct ExportView: View {
                 if !file.json, let text = String(data: file.data, encoding: .utf8) {
                     ShareLink(item: text) { Label("Share text", systemImage: "square.and.arrow.up") }.buttonStyle(PennyButtonStyle())
                 }
-                if !result.isEmpty { Text(result).accessibilityIdentifier("export-result") }
+                if !result.isEmpty {
+                    Text(result).accessibilityIdentifier("export-result")
+                }
             }
             .navigationTitle("Export")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

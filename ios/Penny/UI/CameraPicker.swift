@@ -12,18 +12,27 @@ struct CameraPicker: UIViewControllerRepresentable {
         controller.delegate = context.coordinator
         return controller
     }
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator(finished: finished) }
+
+    func updateUIViewController(_: UIImagePickerController, context _: Context) {}
+    func makeCoordinator() -> Coordinator {
+        Coordinator(finished: finished)
+    }
 
     final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let finished: (Result<Data?, Error>) -> Void
-        init(finished: @escaping (Result<Data?, Error>) -> Void) { self.finished = finished }
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { finished(.success(nil)) }
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        init(finished: @escaping (Result<Data?, Error>) -> Void) {
+            self.finished = finished
+        }
+
+        func imagePickerControllerDidCancel(_: UIImagePickerController) {
+            finished(.success(nil))
+        }
+
+        func imagePickerController(_: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             guard let image = info[.originalImage] as? UIImage else {
                 finished(.failure(PennyError.message("The camera did not return a photo."))); return
             }
-            let ratio = min(1, 2_400 / max(image.size.width, image.size.height))
+            let ratio = min(1, 2400 / max(image.size.width, image.size.height))
             let size = CGSize(width: image.size.width * ratio, height: image.size.height * ratio)
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1

@@ -3,12 +3,12 @@ import Foundation
 enum PennyError: LocalizedError, Equatable {
     case message(String)
     var errorDescription: String? {
-        switch self { case .message(let message): return message }
+        switch self { case let .message(message): message }
     }
 }
 
 enum LetterText {
-    static let limit = 16_000
+    static let limit = 16000
     static let sample = """
     Oak Street Library
     Dear reader,
@@ -33,7 +33,7 @@ enum LetterText {
             .replacingOccurrences(of: #"\b\d(?:[ -]?\d){3,}\b"#, with: "••••", options: .regularExpression)
     }
 
-    static func chunks(_ text: String, limit: Int = 2_000) -> [String] {
+    static func chunks(_ text: String, limit: Int = 2000) -> [String] {
         guard limit > 0 else { return [] }
         var remaining = text.trimmingCharacters(in: .whitespacesAndNewlines)[...]
         var result: [String] = []
@@ -65,6 +65,6 @@ struct ReadingPreferences: Codable, Equatable, Sendable {
     var maskNumbers = true
 
     var valid: Bool {
-        [18.0, 22, 28, 34].contains(textSize) && speechRate.isFinite && (0.3...0.65).contains(speechRate)
+        [18.0, 22, 28, 34].contains(textSize) && speechRate.isFinite && (0.3 ... 0.65).contains(speechRate)
     }
 }

@@ -15,11 +15,13 @@ final class VoiceCommands: ObservableObject {
     private var tapInstalled = false
     var report: ((String) -> Void)?
     var command: ((String) -> Void)?
-    var available: Bool { recognizer?.supportsOnDeviceRecognition == true }
+    var available: Bool {
+        recognizer?.supportsOnDeviceRecognition == true
+    }
 
     func start() async {
         stop()
-        let generation = self.generation
+        let generation = generation
         guard let recognizer, recognizer.supportsOnDeviceRecognition else {
             report?("Offline voice commands are unavailable on this device. Use the visible controls."); return
         }
@@ -29,7 +31,7 @@ final class VoiceCommands: ObservableObject {
         guard generation == self.generation else { return }
         guard status == .authorized else { report?("Speech permission is off. You can enable it in iOS Settings or use the visible controls."); return }
         let microphone = await withCheckedContinuation { continuation in
-            AVAudioSession.sharedInstance().requestRecordPermission { continuation.resume(returning: $0) }
+            AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
         }
         guard generation == self.generation else { return }
         guard microphone else { report?("Microphone permission is off. Every feature is available through the visible controls."); return }
@@ -53,12 +55,13 @@ final class VoiceCommands: ObservableObject {
                     guard let self, self.generation == generation else { return }
                     if let text {
                         self.silence?.cancel()
-                        if final { self.finish(text) }
-                        else {
+                        if final {
+                            self.finish(text)
+                        } else {
                             self.silence = Task { [weak self] in
                                 try? await Task.sleep(for: .seconds(1.5))
                                 guard !Task.isCancelled, let self, self.generation == generation else { return }
-                                self.finish(text)
+                                finish(text)
                             }
                         }
                     } else if error != nil {
@@ -74,8 +77,8 @@ final class VoiceCommands: ObservableObject {
             timeout = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(12))
                 guard !Task.isCancelled, let self, self.generation == generation else { return }
-                self.stop()
-                self.report?("Listening stopped. Tap Talk to Penny to try another command.")
+                stop()
+                report?("Listening stopped. Tap Talk to Penny to try another command.")
             }
         } catch {
             stop()
@@ -83,14 +86,18 @@ final class VoiceCommands: ObservableObject {
         }
     }
 
-    private func finish(_ text: String) { stop(); command?(text.lowercased()) }
+    private func finish(_ text: String) {
+        stop(); command?(text.lowercased())
+    }
 
     func stop() {
         generation = UUID()
         timeout?.cancel()
         silence?.cancel()
         engine.stop()
-        if tapInstalled { engine.inputNode.removeTap(onBus: 0); tapInstalled = false }
+        if tapInstalled {
+            engine.inputNode.removeTap(onBus: 0); tapInstalled = false
+        }
         request?.endAudio()
         task?.cancel()
         task = nil

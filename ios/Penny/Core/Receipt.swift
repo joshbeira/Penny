@@ -38,8 +38,14 @@ struct Receipt: Codable, Identifiable, Equatable, Sendable {
 
 enum PracticeAction: String, Identifiable {
     case flag, card
-    var id: String { rawValue }
-    var title: String { self == .flag ? "Flag sample payment" : "Request sample replacement card" }
+    var id: String {
+        rawValue
+    }
+
+    var title: String {
+        self == .flag ? "Flag sample payment" : "Request sample replacement card"
+    }
+
     var details: String {
         self == .flag ? "Flag the sample £79.00 payment to Unfamiliar merchant for review. No real payment is affected."
             : "Record a practice replacement-card request. No card will be ordered."
