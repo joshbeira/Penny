@@ -17,6 +17,7 @@ struct PennyPage<Content: View>: View {
                 .padding(20)
                 .frame(maxWidth: .infinity)
         }
+        .accessibilityIdentifier("page-scroll")
         .background(PennyTheme.background)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .top, spacing: 0) {

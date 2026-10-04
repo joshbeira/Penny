@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ReaderView: View {
     @EnvironmentObject private var model: PennyModel
+    @Environment(\.verticalSizeClass) private var heightClass
     @ScaledMetric(relativeTo: .body) private var textScale = 1.0
     @State private var photo: PhotosPickerItem?
     @State private var showCamera = false
@@ -41,7 +42,7 @@ struct ReaderView: View {
                 TextEditor(text: Binding(get: { model.text }, set: { model.edit($0) }))
                     .font(.system(size: model.preferences.textSize * textScale))
                     .lineSpacing(6)
-                    .frame(minHeight: 230, maxHeight: 440)
+                    .frame(minHeight: heightClass == .compact ? 160 : 230, maxHeight: heightClass == .compact ? 160 : 440)
                     .padding(10)
                     .scrollContentBackground(.hidden)
                     .background(PennyTheme.surface, in: RoundedRectangle(cornerRadius: 16))

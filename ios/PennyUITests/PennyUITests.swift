@@ -30,13 +30,22 @@ final class PennyUITests: XCTestCase {
                 if element.exists, element.isHittable {
                     element.tap(); return
                 }
+                // Keep gestures inside the document viewport. Swiping the
+                // whole application can invoke system gestures in landscape.
+                let page = app.scrollViews["page-scroll"].firstMatch
+                let target = page.exists ? page : app
                 if direction {
-                    app.swipeUp()
+                    target.swipeUp()
                 } else {
-                    app.swipeDown()
+                    target.swipeDown()
                 }
             }
         }
+        capture("unreachable-control")
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "unreachable-control-hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
         XCTFail("Control was not reachable: \(element)")
     }
 
@@ -104,6 +113,8 @@ final class PennyUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["A camera is unavailable here. Choose a photo or paste text instead."].waitForExistence(timeout: 5))
         tap(app.buttons["sample-letter"])
         XCUIDevice.shared.orientation = .landscapeLeft
+        app.activate()
+        XCTAssertEqual(app.state, .runningForeground)
         let editor = app.textViews["letter-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertTrue((editor.value as? String ?? "").contains("Oak Street Library"))

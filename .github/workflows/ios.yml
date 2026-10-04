@@ -44,6 +44,7 @@ jobs:
           path: |
             ios/build/*.log
             ios/build/screenshots/**/*.png
+            ios/build/screenshots/**/*.txt
             ios/build/screenshots/**/manifest.json
           retention-days: 14
       - uses: actions/upload-artifact@v4
