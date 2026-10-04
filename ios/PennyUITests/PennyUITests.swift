@@ -16,7 +16,7 @@ final class PennyUITests: XCTestCase {
 
     @MainActor
     private func capture(_ name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
@@ -104,6 +104,12 @@ final class PennyUITests: XCTestCase {
         let editor = app.textViews["letter-text"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
         XCTAssertTrue((editor.value as? String ?? "").contains("Oak Street Library"))
+        // Interact after rotating so this checks a usable layout, not just
+        // the existence of an editor retained from the portrait screen.
+        tap(editor)
+        editor.typeText(" Updated after rotation.")
+        tap(app.buttons["Done editing"])
+        XCTAssertTrue((editor.value as? String ?? "").contains("Updated after rotation."))
         capture("ios-landscape")
     }
 
