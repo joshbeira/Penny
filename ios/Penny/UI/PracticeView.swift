@@ -13,19 +13,27 @@ struct PracticeView: View {
             Eyebrow(text: "Practice with confidence")
             Text("A space to explore.").font(.largeTitle.bold())
             Text("Synthetic accounts. No bank connection. No real money, payments or card orders.").foregroundStyle(PennyTheme.amber).accessibilityIdentifier("simulation-notice")
+            Text("Presentation").font(.headline)
             Picker("Presentation", selection: $mode) {
                 Text("Overview").tag("Overview")
                 Text("Detail").tag("Detail")
                 Text("Listen").tag("Listen")
-            }.pickerStyle(.menu)
+            }.pickerStyle(.menu).accessibilityIdentifier("practice-presentation")
             Text("Different ways to present the same information, not a simulation of anyone’s sight.").font(.footnote).foregroundStyle(PennyTheme.muted)
             PennyCard {
-                Text("Sample current account").font(.headline)
-                Text("£1,420.50").font(.largeTitle.bold()).minimumScaleFactor(0.7)
-                Text("Comfortable").font(.title2.bold()).foregroundStyle(PennyTheme.amber)
-                Text("Two sample bills this week · £84.00").foregroundStyle(PennyTheme.muted)
-                if mode == "Detail" {
-                    Text("Monday · Groceries · −£32.40\nTuesday · Pension · +£230.00\nWednesday · Unfamiliar merchant · −£79.00").lineSpacing(8)
+                if mode == "Listen" {
+                    Label("Listen at your pace", systemImage: "speaker.wave.2").font(.title2.bold())
+                    Text("Choose an audio control below. These are the same words you will hear.").foregroundStyle(PennyTheme.muted)
+                    Text(overview)
+                    Text(week).foregroundStyle(PennyTheme.muted)
+                } else {
+                    Text("Sample current account").font(.headline)
+                    Text("£1,420.50").font(.largeTitle.bold()).minimumScaleFactor(0.7)
+                    Text("Comfortable").font(.title2.bold()).foregroundStyle(PennyTheme.amber)
+                    Text("Two sample bills this week · £84.00").foregroundStyle(PennyTheme.muted)
+                    if mode == "Detail" {
+                        Text("Monday · Groceries · −£32.40\nTuesday · Pension · +£230.00\nWednesday · Unfamiliar merchant · −£79.00").lineSpacing(8)
+                    }
                 }
                 Button("Play the Glance") {
                     UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -83,7 +91,7 @@ struct ReceiptsView: View {
     var body: some View {
         PennyPage {
             Eyebrow(text: "Transparent practice actions")
-            Text("\(Receipt.verify(model.archive.receipts) ? "Chain verified" : "Verification failed") · \(model.archive.receipts.count) receipts")
+            Text("\(Receipt.verify(model.archive.receipts) ? "Chain verified" : "Verification failed") · \(model.archive.receipts.count) \(model.archive.receipts.count == 1 ? "receipt" : "receipts")")
                 .font(.title2.bold()).accessibilityIdentifier("receipt-verification")
             Text("Confirmed practice actions link to the previous receipt with SHA-256. This detects inconsistent edits, not a complete rewrite of local history.").foregroundStyle(PennyTheme.muted)
             if model.archive.receipts.isEmpty {
