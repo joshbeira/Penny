@@ -1,3 +1,4 @@
+import CoreGraphics
 import XCTest
 
 final class PennyUITests: XCTestCase {
@@ -30,15 +31,9 @@ final class PennyUITests: XCTestCase {
                 if element.exists, element.isHittable {
                     element.tap(); return
                 }
-                // Keep gestures inside the document viewport. Swiping the
-                // whole application can invoke system gestures in landscape.
                 let page = app.scrollViews["page-scroll"].firstMatch
                 let target: XCUIElement = page.exists ? page : app
-                if direction {
-                    target.swipeUp()
-                } else {
-                    target.swipeDown()
-                }
+                scroll(target, up: direction)
             }
         }
         capture("unreachable-control")
@@ -47,6 +42,40 @@ final class PennyUITests: XCTestCase {
         hierarchy.lifetime = .keepAlways
         add(hierarchy)
         XCTFail("Control was not reachable: \(element)")
+    }
+
+    @MainActor
+    private func scroll(_ page: XCUIElement, up: Bool) {
+        // SwiftUI's scroll view frame includes the fixed bars. Keep both ends
+        // inside the visible page and the gutter outside nested text editors.
+        let frame = page.frame
+        var top = frame.minY + 16
+        var bottom = frame.maxY - 24
+        let navigation = app.navigationBars.firstMatch
+        if navigation.exists {
+            top = max(top, navigation.frame.maxY + 8)
+        }
+        let dismiss = app.buttons["Dismiss message"].firstMatch
+        if dismiss.exists {
+            top = max(top, dismiss.frame.maxY + 8)
+        }
+        let tabs = app.tabBars.firstMatch
+        if tabs.exists {
+            bottom = min(bottom, tabs.frame.minY - 8)
+        }
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.exists {
+            bottom = min(bottom, keyboard.frame.minY - 8)
+        }
+        guard bottom - top >= 40, frame.height > 0 else {
+            XCTFail("No visible document area for a scroll gesture."); return
+        }
+        let dx: CGFloat = frame.width > frame.height ? 0.1 : 0.025
+        let low = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (top + (bottom - top) * 0.8 - frame.minY) / frame.height))
+        let high = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (top + (bottom - top) * 0.2 - frame.minY) / frame.height))
+        let start = up ? low : high
+        let end = up ? high : low
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
     }
 
     @MainActor
