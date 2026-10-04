@@ -28,12 +28,21 @@ final class PennyUITests: XCTestCase {
         _ = element.waitForExistence(timeout: 2)
         for direction in [true, false] {
             for _ in 0 ..< 8 {
-                if element.exists, element.isHittable {
-                    element.tap(); return
-                }
                 let page = app.scrollViews["page-scroll"].firstMatch
+                if element.exists, element.isHittable {
+                    let key = element.identifier.isEmpty ? element.label : element.identifier
+                    let isPageControl = page.exists && page.descendants(matching: element.elementType).matching(identifier: key).firstMatch.exists
+                    let center = CGPoint(x: element.frame.midX, y: element.frame.midY)
+                    // A sliver can be hittable while XCTest taps the centre
+                    // beneath a fixed banner. Reveal the actual tap point.
+                    if !isPageControl || visibleFrame(page).contains(center) {
+                        element.tap(); return
+                    }
+                }
                 let target: XCUIElement = page.exists ? page : app
-                scroll(target, up: direction)
+                let bounds = element.exists ? element.frame : .zero
+                let up = bounds.height > 0 ? bounds.midY > visibleFrame(target).midY : direction
+                scroll(target, up: up)
             }
         }
         capture("unreachable-control")
@@ -45,9 +54,7 @@ final class PennyUITests: XCTestCase {
     }
 
     @MainActor
-    private func scroll(_ page: XCUIElement, up: Bool) {
-        // SwiftUI's scroll view frame includes the fixed bars. Keep both ends
-        // inside the visible page and the gutter outside nested text editors.
+    private func visibleFrame(_ page: XCUIElement) -> CGRect {
         let frame = page.frame
         var top = frame.minY + 16
         var bottom = frame.maxY - 24
@@ -67,12 +74,21 @@ final class PennyUITests: XCTestCase {
         if keyboard.exists {
             bottom = min(bottom, keyboard.frame.minY - 8)
         }
-        guard bottom - top >= 40, frame.height > 0 else {
+        return CGRect(x: frame.minX, y: top, width: frame.width, height: max(0, bottom - top))
+    }
+
+    @MainActor
+    private func scroll(_ page: XCUIElement, up: Bool) {
+        // SwiftUI's scroll view frame includes the fixed bars. Keep both ends
+        // inside the visible page and the gutter outside nested text editors.
+        let frame = page.frame
+        let visible = visibleFrame(page)
+        guard visible.height >= 40, frame.height > 0 else {
             XCTFail("No visible document area for a scroll gesture."); return
         }
         let dx: CGFloat = frame.width > frame.height ? 0.1 : 0.025
-        let low = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (top + (bottom - top) * 0.8 - frame.minY) / frame.height))
-        let high = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (top + (bottom - top) * 0.2 - frame.minY) / frame.height))
+        let low = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (visible.minY + visible.height * 0.8 - frame.minY) / frame.height))
+        let high = page.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: (visible.minY + visible.height * 0.2 - frame.minY) / frame.height))
         let start = up ? low : high
         let end = up ? high : low
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
@@ -170,6 +186,7 @@ final class PennyUITests: XCTestCase {
         tap(app.buttons["text-size"])
         tap(app.buttons["Largest"])
         tap(app.switches["Quiet Mode"])
+        XCTAssertEqual(app.switches["Quiet Mode"].value as? String, "1")
         tap(app.tabBars.buttons["Read"])
         XCTAssertEqual(editor.value as? String, "My corrected letter")
         tap(app.buttons["Read aloud"])
