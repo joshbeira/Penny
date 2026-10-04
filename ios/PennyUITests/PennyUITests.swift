@@ -33,7 +33,7 @@ final class PennyUITests: XCTestCase {
                 // Keep gestures inside the document viewport. Swiping the
                 // whole application can invoke system gestures in landscape.
                 let page = app.scrollViews["page-scroll"].firstMatch
-                let target = page.exists ? page : app
+                let target: XCUIElement = page.exists ? page : app
                 if direction {
                     target.swipeUp()
                 } else {
